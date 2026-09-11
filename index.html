@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>UBG — Reflex Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#eef0f2;
+    --dim:#9ba3ad;
+    --panel:#1b1e24;
+    --panel-2:#22262e;
+    --line: rgba(255,255,255,0.08);
+    --bg:#101215;
+    --dodge-green: rgb(0,255,0);
+    --feint-magenta: rgb(255,0,255);
+    --rank-green:#22c55e;
+    --rank-yellow:#eab308;
+    --rank-red:#ef4444;
+    --steel:#3e5c76;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+  }
+  h1,h2,h3, .display{
+    font-family:'Oswald',sans-serif;
+    letter-spacing:0.01em;
+    margin:0;
+  }
+  .mono{ font-family:'Space Mono',monospace; }
+
+  header{
+    padding:18px 24px 14px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  header .brand{ display:flex; align-items:baseline; gap:10px; }
+  header .brand h1{ font-size:22px; font-weight:700; }
+  header .brand span{ color:var(--dim); font-size:13px; }
+  header .streak{ font-size:13px; color:var(--dim); }
+  header .streak b{ color:var(--ink); font-weight:600; }
+
+  main{
+    flex:1;
+    display:grid;
+    grid-template-columns: minmax(0,1fr) 360px;
+    gap:0;
+  }
+  @media (max-width: 900px){
+    main{ grid-template-columns: 1fr; }
+    aside{ order:2; }
+  }
+
+  .arena-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:28px;
+    position:relative;
+  }
+  .arena{
+    width:100%;
+    max-width:640px;
+    aspect-ratio: 1 / 1;
+    background:#ffffff;
+    border-radius:6px;
+    position:relative;
+    overflow:hidden;
+    cursor:pointer;
+    user-select:none;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 24px 60px -20px rgba(0,0,0,0.6);
+  }
+  .arena.solid{ background: var(--dodge-green); }
+  .arena.solid-magenta{ background: var(--feint-magenta); }
+  .arena .outline-box{
+    position:absolute;
+    inset:18px;
+    border:10px solid var(--dodge-green);
+    border-radius:4px;
+    background: rgba(0,255,0,0.14);
+  }
+  .arena .outline-box.magenta{
+    border-color: var(--feint-magenta);
+    background: rgba(255,0,255,0.14);
+  }
+  .arena-center{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    gap:8px;
+    text-align:center;
+    padding:24px;
+    pointer-events:none;
+  }
+  .arena-center .prompt{
+    font-family:'Oswald',sans-serif;
+    font-size:15px;
+    letter-spacing:0.04em;
+    color:#111;
+    text-transform:uppercase;
+    opacity:0.55;
+  }
+  .arena.solid .arena-center .prompt,
+  .arena.solid-magenta .arena-center .prompt{ display:none; }
+
+  .result-flash{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    gap:6px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.15s ease;
+  }
+  .result-flash.show{ opacity:1; }
+  .result-flash .rank{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:44px;
+    text-transform:uppercase;
+    letter-spacing:0.02em;
+  }
+  .result-flash .detail{
+    font-family:'Space Mono',monospace;
+    font-size:14px;
+    color:rgba(0,0,0,0.65);
+  }
+  .rank-perfect{ color:#15803d; }
+  .rank-normal{ color:#a16207; }
+  .rank-miss{ color:#b91c1c; }
+
+  .arena-foot{
+    margin-top:16px;
+    display:flex;
+    gap:10px;
+    align-items:center;
+    color:var(--dim);
+    font-size:13px;
+  }
+  kbd{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:2px 7px;
+    font-family:'Space Mono',monospace;
+    font-size:12px;
+    color:var(--ink);
+  }
+
+  .startgate{
+    position:absolute; inset:0;
+    background:rgba(16,18,21,0.92);
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:14px;
+    border-radius:6px;
+    padding:20px;
+  }
+  .startgate button{
+    background:var(--dodge-green);
+    color:#04210a;
+    border:none;
+    padding:12px 26px;
+    border-radius:4px;
+    font-family:'Oswald',sans-serif;
+    font-size:15px;
+    font-weight:600;
+    letter-spacing:0.03em;
+    cursor:pointer;
+  }
+  .startgate p{ color:var(--dim); font-size:13px; max-width:360px; text-align:center; margin:0; line-height:1.5; }
+
+  aside{
+    border-left:1px solid var(--line);
+    background:var(--panel);
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+  }
+  .stat-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:1px;
+    background:var(--line);
+    border-bottom:1px solid var(--line);
+  }
+  .stat{ background:var(--panel); padding:14px 16px; }
+  .stat .label{ font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--dim); }
+  .stat .value{ font-family:'Space Mono',monospace; font-size:20px; margin-top:4px; }
+  .stat .value.green{ color:var(--rank-green); }
+  .stat .value.red{ color:var(--rank-red); }
+
+  .panel-section{ padding:14px 16px; border-bottom:1px solid var(--line); }
+  .panel-section h3{ font-size:13px; text-transform:uppercase; letter-spacing:0.05em; color:var(--dim); font-weight:500; margin-bottom:10px; }
+
+  .type-row{ display:flex; justify-content:space-between; font-size:13px; padding:4px 0; color:var(--ink); }
+  .type-row .n{ color:var(--dim); font-family:'Space Mono',monospace; }
+
+  .log{ flex:1; overflow-y:auto; min-height:120px; max-height:220px; }
+  .log table{ width:100%; border-collapse:collapse; font-size:12px; }
+  .log th{
+    position:sticky; top:0; background:var(--panel);
+    text-align:left; color:var(--dim); font-weight:500;
+    padding:6px 8px; border-bottom:1px solid var(--line);
+    text-transform:uppercase; letter-spacing:0.04em; font-size:10px;
+  }
+  .log td{
+    padding:5px 8px; border-bottom:1px solid rgba(255,255,255,0.04);
+    font-family:'Space Mono',monospace; color:var(--ink); white-space:nowrap;
+  }
+  .log tr:last-child{ background:rgba(255,255,255,0.03); }
+  .tag{ display:inline-block; padding:1px 6px; border-radius:3px; font-size:10px; font-weight:700; }
+  .tag.green{ background:rgba(34,197,94,0.15); color:var(--rank-green); }
+  .tag.yellow{ background:rgba(234,179,8,0.15); color:var(--rank-yellow); }
+  .tag.red{ background:rgba(239,68,68,0.15); color:var(--rank-red); }
+
+  .btn-row{ display:flex; gap:8px; padding:12px 16px; }
+  .btn{
+    flex:1; background:var(--panel-2); border:1px solid var(--line); color:var(--ink);
+    padding:9px 10px; border-radius:4px; font-size:12px; font-family:'Inter',sans-serif;
+    font-weight:600; cursor:pointer; text-align:center;
+  }
+  .btn:hover{ background:#282c35; }
+  .btn.accent{ background:var(--steel); border-color:var(--steel); }
+
+  .settings label{ display:block; font-size:12px; color:var(--dim); margin:8px 0 3px; }
+  .settings .range-inputs{ display:flex; gap:6px; }
+  .settings input[type=number]{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--ink);
+    padding:5px 6px; border-radius:3px; font-family:'Space Mono',monospace; font-size:12px;
+  }
+  .group-head{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:16px; padding-top:12px; border-top:1px solid var(--line);
+  }
+  .group-head .name{ color:var(--ink); font-weight:600; font-size:13px; }
+  .group-head .master{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--dim); }
+  .sub-toggle{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink); margin:6px 0 2px; }
+  .sub-toggle input{ width:auto; }
+  .settings summary{ cursor:pointer; font-size:13px; text-transform:uppercase; letter-spacing:0.05em; color:var(--dim); margin-bottom:6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>UBG <span style="font-weight:400;">Reflex Trainer</span></h1>
+    <span>dodge timing calibration</span>
+  </div>
+  <div class="streak">Streak: <b id="streakVal">0</b> &nbsp;·&nbsp; Round <b id="roundVal">0</b></div>
+</header>
+
+<main>
+  <div class="arena-wrap">
+    <div class="arena" id="arena">
+      <div class="arena-center">
+        <div class="prompt" id="promptText">click / press space to begin</div>
+      </div>
+      <div class="result-flash" id="resultFlash">
+        <div class="rank" id="resultRank"></div>
+        <div class="detail" id="resultDetail"></div>
+      </div>
+      <div class="startgate" id="startGate">
+        <p>Solid green = heavy. Outlined green = jab. A feint shows the fake cue first, then cuts straight to magenta — that magenta flash <i>is</i> the real attack, dodge it. Reacting to the green fake gets you fooled.</p>
+        <button id="startBtn">Start Training</button>
+      </div>
+    </div>
+    <div class="arena-foot">
+      <span><kbd>space</kbd> or click the arena to dodge</span>
+      <span id="pauseNote" style="display:none;">&nbsp;·&nbsp; paused</span>
+    </div>
+  </div>
+
+  <aside>
+    <div class="stat-grid">
+      <div class="stat"><div class="label">Avg reaction</div><div class="value" id="statAvg">—</div></div>
+      <div class="stat"><div class="label">Best</div><div class="value green" id="statBest">—</div></div>
+      <div class="stat"><div class="label">Accuracy</div><div class="value" id="statAcc">—</div></div>
+      <div class="stat"><div class="label">Fooled by feint</div><div class="value red" id="statFooled">0</div></div>
+    </div>
+
+    <div class="panel-section">
+      <h3>By attack type</h3>
+      <div class="type-row"><span>Heavy</span><span class="n" id="tHeavy">—</span></div>
+      <div class="type-row"><span>Jab</span><span class="n" id="tJab">—</span></div>
+      <div class="type-row"><span>Heavy → jab feint</span><span class="n" id="tHF">—</span></div>
+      <div class="type-row"><span>Jab → heavy feint</span><span class="n" id="tJF">—</span></div>
+    </div>
+
+    <div class="panel-section">
+      <h3>Presets</h3>
+      <div class="range-inputs" style="margin-bottom:8px;">
+        <select id="presetSelect" style="width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--ink); padding:6px; border-radius:3px; font-size:12px;"></select>
+      </div>
+      <div class="btn-row" style="padding:0 0 4px;">
+        <div class="btn" id="loadPresetBtn">Load</div>
+        <div class="btn" id="savePresetBtn">Save as…</div>
+      </div>
+      <div class="btn-row" style="padding:0;">
+        <div class="btn" id="exportSettingsBtn">Export JSON</div>
+        <div class="btn" id="importSettingsBtn">Import JSON</div>
+      </div>
+      <input type="file" id="importFile" accept="application/json" style="display:none;">
+    </div>
+
+    <details class="panel-section settings">
+      <summary>Advanced settings — everything is tweakable</summary>
+
+      <label>Idle wait before a cue (ms)</label>
+      <div class="range-inputs">
+        <input type="number" id="idleMin" value="900"><input type="number" id="idleMax" value="3200">
+      </div>
+
+      <label class="sub-toggle"><input type="checkbox" id="feintAudio"> Play an audio ping when a feint's real attack lands (matches the real game's feint tell)</label>
+
+      <!-- HEAVY -->
+      <div class="group-head">
+        <span class="name">Normal Heavy</span>
+        <label class="master"><input type="checkbox" id="enableHeavy" checked> enabled</label>
+      </div>
+      <label>Dodge window (ms) — no press by the end of this = hit</label>
+      <div class="range-inputs"><input type="number" id="heavyMin" value="700"><input type="number" id="heavyMax" value="1200"></div>
+      <label>Perfect-dodge cutoff (ms)</label>
+      <div class="range-inputs"><input type="number" id="heavyPerfect" value="300"></div>
+
+      <!-- JAB -->
+      <div class="group-head">
+        <span class="name">Normal Jab</span>
+        <label class="master"><input type="checkbox" id="enableJab" checked> enabled</label>
+      </div>
+      <label>Dodge window (ms) — no press by the end of this = hit</label>
+      <div class="range-inputs"><input type="number" id="jabMin" value="320"><input type="number" id="jabMax" value="600"></div>
+      <label>Perfect-dodge cutoff (ms)</label>
+      <div class="range-inputs"><input type="number" id="jabPerfect" value="150"></div>
+
+      <!-- HEAVY FEINT -->
+      <div class="group-head">
+        <span class="name">Heavy → Jab Feint</span>
+        <label class="master"><input type="checkbox" id="enableHeavyFeint" checked> enabled</label>
+      </div>
+      <label>Fake-cue hold (ms) — green heavy shown before it cuts to the real jab</label>
+      <div class="range-inputs"><input type="number" id="hfFakeMin" value="350"><input type="number" id="hfFakeMax" value="900"></div>
+      <label>Real attack dodge window (ms, magenta jab)</label>
+      <div class="range-inputs"><input type="number" id="hfWinMin" value="320"><input type="number" id="hfWinMax" value="600"></div>
+      <label>Real attack perfect-dodge cutoff (ms)</label>
+      <div class="range-inputs"><input type="number" id="hfPerfect" value="150"></div>
+
+      <!-- JAB FEINT -->
+      <div class="group-head">
+        <span class="name">Jab → Heavy Feint</span>
+        <label class="master"><input type="checkbox" id="enableJabFeint" checked> enabled</label>
+      </div>
+      <label>Fake-cue hold (ms) — green jab shown before it cuts to the real heavy</label>
+      <div class="range-inputs"><input type="number" id="jfFakeMin" value="350"><input type="number" id="jfFakeMax" value="900"></div>
+      <label>Real attack dodge window (ms, magenta heavy)</label>
+      <div class="range-inputs"><input type="number" id="jfWinMin" value="700"><input type="number" id="jfWinMax" value="1200"></div>
+      <label>Real attack perfect-dodge cutoff (ms)</label>
+      <div class="range-inputs"><input type="number" id="jfPerfect" value="300"></div>
+
+      <div class="group-head" style="border-top:1px solid var(--line);">
+        <span class="name">Quick toggles</span>
+      </div>
+      <div class="btn-row" style="padding:8px 0 0;">
+        <div class="btn" id="toggleNormalBtn">Disable normal attacks</div>
+        <div class="btn" id="toggleFeintBtn">Disable feints</div>
+      </div>
+    </details>
+
+    <div class="panel-section" style="flex:1; display:flex; flex-direction:column; min-height:0; border-bottom:none;">
+      <h3>Round log</h3>
+      <div class="log">
+        <table>
+          <thead><tr><th>#</th><th>Type</th><th>ms</th><th>Rank</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <div class="btn" id="exportBtn">Export CSV</div>
+      <div class="btn" id="resetBtn">Reset</div>
+      <div class="btn accent" id="pauseBtn">Pause</div>
+    </div>
+  </aside>
+</main>
+
+<script>
+(function(){
+  "use strict";
+
+  const GREEN = "rgb(0,255,0)";
+  const MAGENTA = "rgb(255,0,255)";
+
+  // ---------------- default settings ----------------
+  const DEFAULT_SETTINGS = {
+    idleWait:   [900, 3200],
+    feintAudio: false,
+    heavy:      { enabled: true, windowMin: 700, windowMax: 1200, perfectMs: 300 },
+    jab:        { enabled: true, windowMin: 320, windowMax: 600,  perfectMs: 150 },
+    heavyFeint: { enabled: true, fakeHoldMin: 350, fakeHoldMax: 900, windowMin: 320, windowMax: 600, perfectMs: 150 },
+    jabFeint:   { enabled: true, fakeHoldMin: 350, fakeHoldMax: 900, windowMin: 700, windowMax: 1200, perfectMs: 300 }
+  };
+
+  const cfg = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+
+  const ID = {
+    idleMin:'idleMin', idleMax:'idleMax', feintAudio:'feintAudio',
+    heavyEnabled:'enableHeavy', heavyMin:'heavyMin', heavyMax:'heavyMax', heavyPerfect:'heavyPerfect',
+    jabEnabled:'enableJab', jabMin:'jabMin', jabMax:'jabMax', jabPerfect:'jabPerfect',
+    hfEnabled:'enableHeavyFeint', hfFakeMin:'hfFakeMin', hfFakeMax:'hfFakeMax', hfWinMin:'hfWinMin', hfWinMax:'hfWinMax', hfPerfect:'hfPerfect',
+    jfEnabled:'enableJabFeint', jfFakeMin:'jfFakeMin', jfFakeMax:'jfFakeMax', jfWinMin:'jfWinMin', jfWinMax:'jfWinMax', jfPerfect:'jfPerfect'
+  };
+  const $ = id => document.getElementById(id);
+
+  function readCfgFromInputs(){
+    cfg.idleWait = [+$(ID.idleMin).value, +$(ID.idleMax).value];
+    cfg.feintAudio = $(ID.feintAudio).checked;
+
+    cfg.heavy = { enabled: $(ID.heavyEnabled).checked, windowMin: +$(ID.heavyMin).value, windowMax: +$(ID.heavyMax).value, perfectMs: +$(ID.heavyPerfect).value };
+    cfg.jab   = { enabled: $(ID.jabEnabled).checked,   windowMin: +$(ID.jabMin).value,   windowMax: +$(ID.jabMax).value,   perfectMs: +$(ID.jabPerfect).value };
+
+    cfg.heavyFeint = { enabled: $(ID.hfEnabled).checked, fakeHoldMin: +$(ID.hfFakeMin).value, fakeHoldMax: +$(ID.hfFakeMax).value, windowMin: +$(ID.hfWinMin).value, windowMax: +$(ID.hfWinMax).value, perfectMs: +$(ID.hfPerfect).value };
+    cfg.jabFeint   = { enabled: $(ID.jfEnabled).checked, fakeHoldMin: +$(ID.jfFakeMin).value, fakeHoldMax: +$(ID.jfFakeMax).value, windowMin: +$(ID.jfWinMin).value, windowMax: +$(ID.jfWinMax).value, perfectMs: +$(ID.jfPerfect).value };
+  }
+
+  function applySettingsToInputs(s){
+    $(ID.idleMin).value = s.idleWait[0]; $(ID.idleMax).value = s.idleWait[1];
+    $(ID.feintAudio).checked = !!s.feintAudio;
+
+    $(ID.heavyEnabled).checked = s.heavy.enabled !== false;
+    $(ID.heavyMin).value = s.heavy.windowMin; $(ID.heavyMax).value = s.heavy.windowMax; $(ID.heavyPerfect).value = s.heavy.perfectMs;
+
+    $(ID.jabEnabled).checked = s.jab.enabled !== false;
+    $(ID.jabMin).value = s.jab.windowMin; $(ID.jabMax).value = s.jab.windowMax; $(ID.jabPerfect).value = s.jab.perfectMs;
+
+    $(ID.hfEnabled).checked = s.heavyFeint.enabled !== false;
+    $(ID.hfFakeMin).value = s.heavyFeint.fakeHoldMin; $(ID.hfFakeMax).value = s.heavyFeint.fakeHoldMax;
+    $(ID.hfWinMin).value = s.heavyFeint.windowMin; $(ID.hfWinMax).value = s.heavyFeint.windowMax; $(ID.hfPerfect).value = s.heavyFeint.perfectMs;
+
+    $(ID.jfEnabled).checked = s.jabFeint.enabled !== false;
+    $(ID.jfFakeMin).value = s.jabFeint.fakeHoldMin; $(ID.jfFakeMax).value = s.jabFeint.fakeHoldMax;
+    $(ID.jfWinMin).value = s.jabFeint.windowMin; $(ID.jfWinMax).value = s.jabFeint.windowMax; $(ID.jfPerfect).value = s.jabFeint.perfectMs;
+
+    readCfgFromInputs();
+  }
+
+  document.querySelectorAll('.settings input[type=number]').forEach(el => el.addEventListener('change', readCfgFromInputs));
+  document.querySelectorAll('.settings input[type=checkbox]').forEach(el => el.addEventListener('change', readCfgFromInputs));
+
+  document.getElementById('toggleNormalBtn').addEventListener('click', ()=>{
+    const on = !( $(ID.heavyEnabled).checked || $(ID.jabEnabled).checked );
+    $(ID.heavyEnabled).checked = on; $(ID.jabEnabled).checked = on;
+    document.getElementById('toggleNormalBtn').textContent = on ? 'Disable normal attacks' : 'Enable normal attacks';
+    readCfgFromInputs();
+  });
+  document.getElementById('toggleFeintBtn').addEventListener('click', ()=>{
+    const on = !( $(ID.hfEnabled).checked || $(ID.jfEnabled).checked );
+    $(ID.hfEnabled).checked = on; $(ID.jfEnabled).checked = on;
+    document.getElementById('toggleFeintBtn').textContent = on ? 'Disable feints' : 'Enable feints';
+    readCfgFromInputs();
+  });
+
+  // ---------------- presets ----------------
+  let presets = { "Default": DEFAULT_SETTINGS };
+  const presetSelect = document.getElementById('presetSelect');
+
+  function refreshPresetDropdown(selectName){
+    presetSelect.innerHTML = '';
+    Object.keys(presets).forEach(name=>{
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      presetSelect.appendChild(opt);
+    });
+    if (selectName && presets[selectName]) presetSelect.value = selectName;
+  }
+  refreshPresetDropdown('Default');
+
+  document.getElementById('loadPresetBtn').addEventListener('click', ()=>{
+    const name = presetSelect.value;
+    if (presets[name]) applySettingsToInputs(presets[name]);
+  });
+
+  document.getElementById('savePresetBtn').addEventListener('click', ()=>{
+    readCfgFromInputs();
+    const name = prompt('Name this preset:', 'My Preset');
+    if (!name) return;
+    presets[name] = JSON.parse(JSON.stringify(cfg));
+    refreshPresetDropdown(name);
+  });
+
+  document.getElementById('exportSettingsBtn').addEventListener('click', ()=>{
+    readCfgFromInputs();
+    const blob = new Blob([JSON.stringify(cfg, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (presetSelect.value || 'ubg-settings') + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('importSettingsBtn').addEventListener('click', ()=> document.getElementById('importFile').click());
+  document.getElementById('importFile').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        const required = ['idleWait','heavy','jab','heavyFeint','jabFeint'];
+        if (!required.every(k => parsed[k] !== undefined)) throw new Error('missing fields');
+        const name = file.name.replace(/\.json$/i,'') || 'Imported';
+        presets[name] = parsed;
+        refreshPresetDropdown(name);
+        applySettingsToInputs(parsed);
+      } catch(err){
+        alert("That file doesn't look like a valid UBG settings export.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  function rand(min, max){ return Math.random() * (max - min) + min; }
+
+  // ---------------- audio ping (feint tell, optional) ----------------
+  let actx = null;
+  function ping(){
+    if (!cfg.feintAudio) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = actx.createOscillator();
+      const g = actx.createGain();
+      o.type = 'sine'; o.frequency.value = 1500;
+      g.gain.setValueAtTime(0.08, actx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.12);
+      o.connect(g); g.connect(actx.destination);
+      o.start(); o.stop(actx.currentTime + 0.12);
+    } catch(e){ /* audio unsupported, ignore */ }
+  }
+
+  // ---------------- state ----------------
+  let running = false, paused = false, roundNum = 0, streak = 0;
+  let data = [];
+  let timers = [];
+  let phase = "idle"; // idle | fake | real | resolved
+  let cueStart = 0;
+  let currentRound = null;
+  let listenersBound = false;
+
+  const arena = document.getElementById('arena');
+  const promptText = document.getElementById('promptText');
+  const resultFlash = document.getElementById('resultFlash');
+  const resultRank = document.getElementById('resultRank');
+  const resultDetail = document.getElementById('resultDetail');
+  const startGate = document.getElementById('startGate');
+  const streakVal = document.getElementById('streakVal');
+  const roundVal = document.getElementById('roundVal');
+
+  function clearTimers(){ timers.forEach(t=>clearTimeout(t)); timers = []; }
+  function after(ms, fn){ const id = setTimeout(fn, ms); timers.push(id); return id; }
+
+  function setArenaWhite(){
+    arena.className = 'arena';
+    arena.querySelectorAll('.outline-box').forEach(n=>n.remove());
+    promptText.textContent = 'click / press space to begin';
+  }
+  function setArenaSolid(color){ arena.className = 'arena solid' + (color === MAGENTA ? '-magenta' : ''); }
+  function setArenaOutline(color){
+    arena.className = 'arena';
+    const box = document.createElement('div');
+    box.className = 'outline-box' + (color === MAGENTA ? ' magenta' : '');
+    arena.appendChild(box);
+  }
+
+  function showResult(rankClass, rankLabel, detail){
+    resultRank.className = 'rank rank-' + rankClass;
+    resultRank.textContent = rankLabel;
+    resultDetail.textContent = detail;
+    resultFlash.classList.add('show');
+  }
+  function hideResult(){ resultFlash.classList.remove('show'); }
+
+  function enabledTypes(){
+    const t = [];
+    if (cfg.heavy.enabled) t.push('HEAVY');
+    if (cfg.jab.enabled) t.push('JAB');
+    if (cfg.heavyFeint.enabled) t.push('HEAVY_FEINT');
+    if (cfg.jabFeint.enabled) t.push('JAB_FEINT');
+    return t;
+  }
+
+  // ---------------- round flow ----------------
+  function scheduleNextRound(){
+    phase = "idle";
+    hideResult();
+    setArenaWhite();
+    if (!running || paused) return;
+    const wait = rand(cfg.idleWait[0], cfg.idleWait[1]);
+    after(wait, startRound);
+  }
+
+  function startRound(){
+    if (!running || paused) return;
+    const pool = enabledTypes();
+    if (!pool.length) { alert('Enable at least one attack type to keep training.'); pauseGame(); return; }
+
+    roundNum++;
+    roundVal.textContent = roundNum;
+    const type = pool[Math.floor(Math.random() * pool.length)];
+
+    currentRound = {
+      round: roundNum, type: type, style: null, color: null,
+      fakeHoldMs: null, window: null, perfectMs: null,
+      reactionMs: null, outcome: null, note: "", ts: new Date().toISOString()
+    };
+
+    if (type === "HEAVY") beginReal("HEAVY", GREEN, cfg.heavy);
+    else if (type === "JAB") beginReal("JAB", GREEN, cfg.jab);
+    else if (type === "HEAVY_FEINT") beginFake("HEAVY", "JAB", cfg.heavyFeint);
+    else if (type === "JAB_FEINT") beginFake("JAB", "HEAVY", cfg.jabFeint);
+  }
+
+  // Fake cue (green) -> straight to the real attack, colored magenta. No extra green stage.
+  function beginFake(fakeAs, realAs, feintCfg){
+    phase = "fake";
+    currentRound.realKind = realAs;
+    const hold = rand(feintCfg.fakeHoldMin, feintCfg.fakeHoldMax);
+    currentRound.fakeHoldMs = Math.round(hold);
+    cueStart = performance.now();
+
+    if (fakeAs === "HEAVY") setArenaSolid(GREEN); else setArenaOutline(GREEN);
+
+    after(hold, ()=>{
+      if (phase !== "fake") return; // already resolved by an early press
+      beginReal(realAs, MAGENTA, feintCfg);
+      if (currentRound) currentRound.note = "feint";
+    });
+  }
+
+  function beginReal(kind, color, settings){
+    phase = "real";
+    currentRound.style = kind;
+    currentRound.color = color;
+    const windowMs = rand(settings.windowMin, settings.windowMax);
+    currentRound.window = Math.round(windowMs);
+    currentRound.perfectMs = settings.perfectMs;
+    cueStart = performance.now();
+
+    if (color === MAGENTA) ping();
+
+    if (kind === "HEAVY") setArenaSolid(color); else setArenaOutline(color);
+
+    after(windowMs, ()=>{ if (phase === "real") resolveRound(null); });
+  }
+
+  function resolveRound(reactionMs){
+    if (phase === "resolved" || phase === "idle") return;
+    const wasFake = (phase === "fake");
+    phase = "resolved";
+    clearTimers();
+
+    if (wasFake) {
+      currentRound.reactionMs = reactionMs;
+      currentRound.outcome = "RED";
+      currentRound.note = "fooled by feint";
+      streak = 0;
+      showResult('miss', 'FOOLED', `reacted to the fake in ${Math.round(reactionMs)}ms`);
+    } else {
+      currentRound.reactionMs = reactionMs;
+      if (reactionMs === null) {
+        currentRound.outcome = "RED";
+        currentRound.note = currentRound.note === "feint" ? "hit (after feint)" : "no dodge";
+        streak = 0;
+        showResult('miss', 'HIT', 'no dodge in time');
+      } else if (reactionMs <= currentRound.perfectMs) {
+        currentRound.outcome = "GREEN";
+        streak++;
+        showResult('perfect', 'PERFECT', `${Math.round(reactionMs)}ms`);
+      } else {
+        currentRound.outcome = "YELLOW";
+        streak++;
+        showResult('normal', 'DODGED', `${Math.round(reactionMs)}ms`);
+      }
+    }
+
+    streakVal.textContent = streak;
+    data.push(Object.assign({}, currentRound));
+    logRow(currentRound);
+    updateStats();
+    after(950, scheduleNextRound);
+  }
+
+  // ---------------- input ----------------
+  function handleDodge(){
+    if (!running || paused) return;
+    if (phase === "idle" || phase === "resolved") return;
+    const reactionMs = performance.now() - cueStart;
+    resolveRound(reactionMs);
+  }
+
+  function bindInputs(){
+    if (listenersBound) return;
+    listenersBound = true;
+    window.addEventListener('keydown', (e)=>{ if (e.code === 'Space') { e.preventDefault(); handleDodge(); } });
+    arena.addEventListener('click', ()=>{ if (running) handleDodge(); });
+  }
+
+  // ---------------- stats / log ----------------
+  function fmt(ms){ return (ms === null || ms === undefined || isNaN(ms)) ? '—' : Math.round(ms) + 'ms'; }
+
+  function updateStats(){
+    const timedGood = data.filter(d => d.reactionMs !== null && (d.outcome==="GREEN"||d.outcome==="YELLOW"));
+    document.getElementById('statAvg').textContent = timedGood.length ? fmt(timedGood.reduce((a,b)=>a+b.reactionMs,0)/timedGood.length) : '—';
+    document.getElementById('statBest').textContent = timedGood.length ? fmt(Math.min(...timedGood.map(d=>d.reactionMs))) : '—';
+
+    const scored = data.filter(d=>d.outcome==="GREEN"||d.outcome==="YELLOW"||d.outcome==="RED");
+    const good = data.filter(d=>d.outcome==="GREEN"||d.outcome==="YELLOW").length;
+    document.getElementById('statAcc').textContent = scored.length ? Math.round(100*good/scored.length) + '%' : '—';
+
+    document.getElementById('statFooled').textContent = data.filter(d=>d.note === "fooled by feint").length;
+
+    function byType(t){
+      const rows = data.filter(d=>d.type===t);
+      if (!rows.length) return '—';
+      const timed = rows.filter(d=>d.reactionMs!==null && (d.outcome==="GREEN"||d.outcome==="YELLOW"));
+      const avg = timed.length ? Math.round(timed.reduce((a,b)=>a+b.reactionMs,0)/timed.length) : null;
+      return rows.length + ' runs' + (avg ? ` · ${avg}ms avg` : '');
+    }
+    document.getElementById('tHeavy').textContent = byType('HEAVY');
+    document.getElementById('tJab').textContent = byType('JAB');
+    document.getElementById('tHF').textContent = byType('HEAVY_FEINT');
+    document.getElementById('tJF').textContent = byType('JAB_FEINT');
+  }
+
+  function typeLabel(t){
+    return { HEAVY:'Heavy', JAB:'Jab', HEAVY_FEINT:'Heavy→Jab feint', JAB_FEINT:'Jab→Heavy feint' }[t] || t;
+  }
+
+  function logRow(r){
+    const tbody = document.getElementById('logBody');
+    const tr = document.createElement('tr');
+    const tagClass = r.outcome === 'GREEN' ? 'green' : r.outcome === 'YELLOW' ? 'yellow' : 'red';
+    const tagText = r.outcome === 'GREEN' ? 'PERFECT' : r.outcome === 'YELLOW' ? 'DODGE' : (r.note==='fooled by feint' ? 'FOOLED' : 'HIT');
+    tr.innerHTML = `<td>${r.round}</td><td>${typeLabel(r.type)}</td><td>${fmt(r.reactionMs)}</td><td><span class="tag ${tagClass}">${tagText}</span></td>`;
+    tbody.appendChild(tr);
+    const log = document.querySelector('.log');
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function pauseGame(){
+    paused = true;
+    document.getElementById('pauseBtn').textContent = 'Resume';
+    document.getElementById('pauseNote').style.display = 'inline';
+    clearTimers(); setArenaWhite(); phase = 'idle';
+  }
+
+  // ---------------- controls ----------------
+  document.getElementById('startBtn').addEventListener('click', ()=>{
+    readCfgFromInputs();
+    if (!enabledTypes().length) { alert('Enable at least one attack type before starting.'); return; }
+    startGate.style.display = 'none';
+    running = true; paused = false;
+    bindInputs();
+    scheduleNextRound();
+  });
+
+  document.getElementById('pauseBtn').addEventListener('click', ()=>{
+    if (!running) return;
+    if (paused) {
+      paused = false;
+      document.getElementById('pauseBtn').textContent = 'Pause';
+      document.getElementById('pauseNote').style.display = 'none';
+      scheduleNextRound();
+    } else {
+      pauseGame();
+    }
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    data = []; roundNum = 0; streak = 0;
+    roundVal.textContent = 0; streakVal.textContent = 0;
+    document.getElementById('logBody').innerHTML = '';
+    updateStats();
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    if (!data.length) return;
+    const cols = ['round','type','style','color','fakeHoldMs','window','perfectMs','reactionMs','outcome','note','ts'];
+    const rows = [cols.join(',')].concat(data.map(d=>cols.map(c=>{
+      let v = d[c];
+      if (v === null || v === undefined) v = '';
+      return String(v).replace(/,/g,';');
+    }).join(',')));
+    const blob = new Blob([rows.join('\n')], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'ubg-reflex-data.csv'; a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  readCfgFromInputs();
+  updateStats();
+})();
+</script>
+</body>
+</html>

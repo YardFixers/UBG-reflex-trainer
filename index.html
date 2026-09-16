@@ -19,6 +19,7 @@
     --rank-green:#22c55e;
     --rank-yellow:#eab308;
     --rank-red:#ef4444;
+    --rank-counter:#22d3ee;
     --steel:#3e5c76;
   }
   *{box-sizing:border-box;}
@@ -87,6 +88,7 @@
   }
   .arena.solid{ background: var(--dodge-green); }
   .arena.solid-magenta{ background: var(--feint-magenta); }
+  .arena.special-flag{ box-shadow: inset 0 0 0 10px rgba(255,20,20,0.95); }
   .arena .outline-box{
     position:absolute;
     inset:18px;
@@ -149,6 +151,7 @@
   .rank-perfect{ color:#15803d; }
   .rank-normal{ color:#a16207; }
   .rank-miss{ color:#b91c1c; }
+  .rank-counter{ color:#0e7490; }
 
   .arena-foot{
     margin-top:16px;
@@ -233,6 +236,7 @@
   .tag.green{ background:rgba(34,197,94,0.15); color:var(--rank-green); }
   .tag.yellow{ background:rgba(234,179,8,0.15); color:var(--rank-yellow); }
   .tag.red{ background:rgba(239,68,68,0.15); color:var(--rank-red); }
+  .tag.counter{ background:rgba(34,211,238,0.15); color:var(--rank-counter); }
 
   .btn-row{ display:flex; gap:8px; padding:12px 16px; }
   .btn{
@@ -258,6 +262,12 @@
   .sub-toggle{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink); margin:6px 0 2px; }
   .sub-toggle input{ width:auto; }
   .settings summary{ cursor:pointer; font-size:13px; text-transform:uppercase; letter-spacing:0.05em; color:var(--dim); margin-bottom:6px; }
+  .settings input[type=number]:disabled, .settings input[type=checkbox]:disabled, .settings input[type=range]:disabled{
+    opacity:0.4; cursor:not-allowed;
+  }
+  .slider-row{ display:flex; align-items:center; gap:10px; margin:4px 0 2px; }
+  .slider-row input[type=range]{ flex:1; accent-color: var(--steel); }
+  .slider-row .n{ font-family:'Space Mono',monospace; font-size:12px; color:var(--ink); min-width:28px; text-align:right; }
 </style>
 </head>
 <body>
@@ -267,11 +277,15 @@
     <h1>UBG <span style="font-weight:400;">Reflex Trainer</span></h1>
     <span>dodge timing calibration</span>
   </div>
-  <div class="streak">Streak: <b id="streakVal">0</b> &nbsp;·&nbsp; Round <b id="roundVal">0</b></div>
+  <div style="display:flex; align-items:center; gap:14px;">
+    <div class="streak">Streak: <b id="streakVal">0</b> &nbsp;·&nbsp; Round <b id="roundVal">0</b></div>
+    <button id="pauseBtnTop" class="btn accent" style="flex:none; padding:6px 14px;">Pause</button>
+  </div>
 </header>
 
 <main>
   <div class="arena-wrap">
+    <div id="styleBadge" style="font-size:11px; color:var(--dim); margin-bottom:8px; letter-spacing:0.03em; text-transform:uppercase;">Playing as: Custom / Advanced Settings</div>
     <div class="arena" id="arena">
       <div class="arena-center">
         <div class="prompt" id="promptText">click / press space to begin</div>
@@ -281,7 +295,7 @@
         <div class="detail" id="resultDetail"></div>
       </div>
       <div class="startgate" id="startGate">
-        <p>Solid green = heavy. Outlined green = jab. A feint shows the fake cue first, then cuts straight to magenta — that magenta flash <i>is</i> the real attack, dodge it. Reacting to the green fake gets you fooled.</p>
+        <p>Solid green = heavy. Outlined green = jab. A feint shows the fake cue first, then cuts straight to magenta — that magenta flash <i>is</i> the real attack, but it still has a brief startup before it actually lands, so dodging the instant you see it is too early. Dodge early on a normal attack and you still slip it, just not perfectly. Dodge early into a feint and it catches you clean.</p>
         <button id="startBtn">Start Training</button>
       </div>
     </div>
@@ -300,11 +314,35 @@
     </div>
 
     <div class="panel-section">
+      <h3>Colors</h3>
+      <label style="display:block; font-size:12px; color:var(--dim); margin:0 0 6px;">Attack color — the feint/indicator color is always this, inverted, and can't be set directly (that's the whole point: it has to read as "the opposite" at a glance).</label>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+        <input type="color" id="attackColorInput" value="#00ff00" style="width:42px; height:32px; border:1px solid var(--line); border-radius:4px; background:var(--panel-2); padding:2px; cursor:pointer;">
+        <div style="flex:1;">
+          <div style="font-size:11px; color:var(--dim);">Attack color</div>
+          <div class="mono" id="attackColorHexLabel" style="font-size:12px;">#00ff00</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div id="feintColorSwatch" style="width:42px; height:32px; border:1px solid var(--line); border-radius:4px; opacity:0.9;"></div>
+        <div style="flex:1;">
+          <div style="font-size:11px; color:var(--dim);">Feint color (locked, auto-inverted)</div>
+          <div class="mono" id="feintColorHexLabel" style="font-size:12px;">#ff00ff</div>
+        </div>
+      </div>
+      <div class="btn-row" style="padding:8px 0 0;">
+        <div class="btn" id="resetColorBtn">Reset to default green/magenta</div>
+      </div>
+    </div>
+
+    <div class="panel-section">
       <h3>By attack type</h3>
       <div class="type-row"><span>Heavy</span><span class="n" id="tHeavy">—</span></div>
       <div class="type-row"><span>Jab</span><span class="n" id="tJab">—</span></div>
       <div class="type-row"><span>Heavy → jab feint</span><span class="n" id="tHF">—</span></div>
       <div class="type-row"><span>Jab → heavy feint</span><span class="n" id="tJF">—</span></div>
+      <div class="type-row"><span>Counters landed</span><span class="n" id="tCounter">—</span></div>
+      <div class="type-row"><span>Backdash degradation</span><span class="n" id="tDegradation">off</span></div>
     </div>
 
     <div class="panel-section">
@@ -323,6 +361,33 @@
       <input type="file" id="importFile" accept="application/json" style="display:none;">
     </div>
 
+    <div class="panel-section">
+      <h3>UBG fighting styles</h3>
+      <div class="range-inputs" style="margin-bottom:8px;">
+        <select id="styleSelect" style="width:100%; background:var(--panel-2); border:1px solid var(--line); color:var(--ink); padding:6px; border-radius:3px; font-size:12px;"></select>
+      </div>
+      <div class="btn-row" style="padding:0 0 8px;">
+        <div class="btn" id="loadStyleBtn">Load Style</div>
+        <div class="btn accent" id="randomStyleBtn">🎲 Random Style</div>
+      </div>
+      <div id="sluggerChargeRow" class="slider-row" style="display:none;">
+        <span style="font-size:11px; color:var(--dim); white-space:nowrap;">Charge</span>
+        <input type="range" id="sluggerCharge" min="0" max="100" value="50">
+        <span class="n" id="sluggerChargeN" style="min-width:80px;">50%</span>
+      </div>
+      <p id="styleDesc" style="font-size:11px; color:var(--dim); line-height:1.5; margin:6px 0;">Pick a style to load its timing profile.</p>
+      <p id="specialDesc" style="font-size:11px; color:var(--dim); line-height:1.5; margin:0 0 6px;"></p>
+      <label class="sub-toggle"><input type="checkbox" id="randomEveryRound"> Roll a new random style before every round (max variety)</label>
+      <label class="sub-toggle"><input type="checkbox" id="styleLock"> Lock to exact style timings (disables manual editing below)</label>
+      <div class="group-head">
+        <span class="name">Style special attacks</span>
+        <label class="master"><input type="checkbox" id="specialsEnabled"> enabled</label>
+      </div>
+      <label>Chance multiplier (%) — scales every style's own special-trigger chance up or down</label>
+      <div class="range-inputs"><input type="number" id="specialChanceMult" value="100" min="0" max="300"></div>
+      <p style="font-size:10px; color:var(--dim); line-height:1.5; margin:6px 0 0;">UBG doesn't publish exact frame data — these are reasoned from each style's documented relative speed/power (official wiki move descriptions + community tier lists, Sept 2026 meta), translated onto this trainer's timing model. Treat them as close approximations, not official numbers.</p>
+    </div>
+
     <details class="panel-section settings">
       <summary>Advanced settings — everything is tweakable</summary>
 
@@ -332,6 +397,37 @@
       </div>
 
       <label class="sub-toggle"><input type="checkbox" id="feintAudio"> Play an audio ping when a feint's real attack lands (matches the real game's feint tell)</label>
+      <label class="sub-toggle"><input type="checkbox" id="preFireEnabled" checked> Allow pre-firing — dodging before the cue even appears still counts</label>
+      <label>Pre-fire grace window (ms) — a click only counts if it's within this many ms of the cue actually appearing; earlier clicks are just ignored, not held</label>
+      <div class="range-inputs"><input type="number" id="preFireGraceMs" value="700"></div>
+      <label class="sub-toggle"><input type="checkbox" id="preFirePunishFeint" checked> ...but pre-firing into a feint gets you hit (real-game behavior)</label>
+
+      <div class="group-head">
+        <span class="name">Counter window</span>
+        <label class="master"><input type="checkbox" id="counterEnabled"> enabled</label>
+      </div>
+      <label>Reacting inside this % of a perfect-cutoff counts as a COUNTER (UBG: hitting an opponent mid-windup makes their attack whiff for bonus damage)</label>
+      <div class="range-inputs"><input type="number" id="counterFraction" value="35" min="1" max="99"></div>
+
+      <div class="group-head">
+        <span class="name">Backdash degradation</span>
+        <label class="master"><input type="checkbox" id="degradationEnabled"> enabled</label>
+      </div>
+      <label>Points gained per non-perfect dodge / points recovered per Perfect or Counter</label>
+      <div class="range-inputs">
+        <input type="number" id="degradationPerDodge" value="20">
+        <input type="number" id="degradationRecoverPerPerfect" value="6">
+      </div>
+      <label>Stage-3 threshold — at this many points, feints can no longer be dodged at all (matches the real game)</label>
+      <div class="range-inputs"><input type="number" id="degradationStage3" value="60"></div>
+
+      <div class="group-head">
+        <span class="name">Feint forgiveness</span>
+      </div>
+      <label>Window multiplier — every feint's real-attack window & perfect cutoff gets scaled by this. Feints need more room than a plain attack because you have to recognize the reveal first, not just react to it. Raise this if feints feel impossible; set to 1.0 for the raw, un-forgiven numbers.</label>
+      <div class="range-inputs"><input type="number" id="feintWindowMult" value="1.4" step="0.05" min="0.5" max="3"></div>
+      <label>Startup multiplier — scales down the "too early" dead-zone on feints, so more of the window is actually usable</label>
+      <div class="range-inputs"><input type="number" id="feintStartupMult" value="0.65" step="0.05" min="0" max="1.5"></div>
 
       <!-- HEAVY -->
       <div class="group-head">
@@ -339,9 +435,11 @@
         <label class="master"><input type="checkbox" id="enableHeavy" checked> enabled</label>
       </div>
       <label>Dodge window (ms) — no press by the end of this = hit</label>
-      <div class="range-inputs"><input type="number" id="heavyMin" value="700"><input type="number" id="heavyMax" value="1200"></div>
+      <div class="range-inputs"><input type="number" id="heavyMin" value="650"><input type="number" id="heavyMax" value="1150"></div>
       <label>Perfect-dodge cutoff (ms)</label>
-      <div class="range-inputs"><input type="number" id="heavyPerfect" value="300"></div>
+      <div class="range-inputs"><input type="number" id="heavyPerfect" value="280"></div>
+      <label>How often this appears, relative to the other types</label>
+      <div class="slider-row"><input type="range" id="heavyWeight" min="0" max="100" value="25"><span class="n" id="heavyWeightN">25</span></div>
 
       <!-- JAB -->
       <div class="group-head">
@@ -349,9 +447,11 @@
         <label class="master"><input type="checkbox" id="enableJab" checked> enabled</label>
       </div>
       <label>Dodge window (ms) — no press by the end of this = hit</label>
-      <div class="range-inputs"><input type="number" id="jabMin" value="320"><input type="number" id="jabMax" value="600"></div>
+      <div class="range-inputs"><input type="number" id="jabMin" value="280"><input type="number" id="jabMax" value="550"></div>
       <label>Perfect-dodge cutoff (ms)</label>
-      <div class="range-inputs"><input type="number" id="jabPerfect" value="150"></div>
+      <div class="range-inputs"><input type="number" id="jabPerfect" value="130"></div>
+      <label>How often this appears, relative to the other types</label>
+      <div class="slider-row"><input type="range" id="jabWeight" min="0" max="100" value="25"><span class="n" id="jabWeightN">25</span></div>
 
       <!-- HEAVY FEINT -->
       <div class="group-head">
@@ -359,11 +459,15 @@
         <label class="master"><input type="checkbox" id="enableHeavyFeint" checked> enabled</label>
       </div>
       <label>Fake-cue hold (ms) — green heavy shown before it cuts to the real jab</label>
-      <div class="range-inputs"><input type="number" id="hfFakeMin" value="350"><input type="number" id="hfFakeMax" value="900"></div>
-      <label>Real attack dodge window (ms, magenta jab)</label>
-      <div class="range-inputs"><input type="number" id="hfWinMin" value="320"><input type="number" id="hfWinMax" value="600"></div>
+      <div class="range-inputs"><input type="number" id="hfFakeMin" value="250"><input type="number" id="hfFakeMax" value="650"></div>
+      <label>Startup delay (ms) — dodging the instant magenta appears is still too early, the jab hasn't landed yet</label>
+      <div class="range-inputs"><input type="number" id="hfStartMin" value="40"><input type="number" id="hfStartMax" value="90"></div>
+      <label>Real attack dodge window (ms, magenta jab) — measured from magenta appearing, must be longer than the startup delay above</label>
+      <div class="range-inputs"><input type="number" id="hfWinMin" value="280"><input type="number" id="hfWinMax" value="550"></div>
       <label>Real attack perfect-dodge cutoff (ms)</label>
-      <div class="range-inputs"><input type="number" id="hfPerfect" value="150"></div>
+      <div class="range-inputs"><input type="number" id="hfPerfect" value="130"></div>
+      <label>How often this appears, relative to the other types</label>
+      <div class="slider-row"><input type="range" id="hfWeight" min="0" max="100" value="25"><span class="n" id="hfWeightN">25</span></div>
 
       <!-- JAB FEINT -->
       <div class="group-head">
@@ -371,11 +475,15 @@
         <label class="master"><input type="checkbox" id="enableJabFeint" checked> enabled</label>
       </div>
       <label>Fake-cue hold (ms) — green jab shown before it cuts to the real heavy</label>
-      <div class="range-inputs"><input type="number" id="jfFakeMin" value="350"><input type="number" id="jfFakeMax" value="900"></div>
-      <label>Real attack dodge window (ms, magenta heavy)</label>
-      <div class="range-inputs"><input type="number" id="jfWinMin" value="700"><input type="number" id="jfWinMax" value="1200"></div>
+      <div class="range-inputs"><input type="number" id="jfFakeMin" value="250"><input type="number" id="jfFakeMax" value="650"></div>
+      <label>Startup delay (ms) — dodging the instant magenta appears is still too early, the heavy hasn't landed yet (naturally longer than a jab's)</label>
+      <div class="range-inputs"><input type="number" id="jfStartMin" value="90"><input type="number" id="jfStartMax" value="180"></div>
+      <label>Real attack dodge window (ms, magenta heavy) — measured from magenta appearing, must be longer than the startup delay above</label>
+      <div class="range-inputs"><input type="number" id="jfWinMin" value="650"><input type="number" id="jfWinMax" value="1150"></div>
       <label>Real attack perfect-dodge cutoff (ms)</label>
-      <div class="range-inputs"><input type="number" id="jfPerfect" value="300"></div>
+      <div class="range-inputs"><input type="number" id="jfPerfect" value="280"></div>
+      <label>How often this appears, relative to the other types</label>
+      <div class="slider-row"><input type="range" id="jfWeight" min="0" max="100" value="25"><span class="n" id="jfWeightN">25</span></div>
 
       <div class="group-head" style="border-top:1px solid var(--line);">
         <span class="name">Quick toggles</span>
@@ -411,61 +519,145 @@
   const GREEN = "rgb(0,255,0)";
   const MAGENTA = "rgb(255,0,255)";
 
+  // ---------------- Attack color customization ----------------
+  // GREEN/MAGENTA above are fixed internal identity tags used for game-logic comparisons (e.g. "is this
+  // the feint's real attack") — they never change. What the player actually SEES is driven by the CSS
+  // custom properties below, which this section keeps in sync with their chosen attack color. The feint
+  // color is always the exact RGB inversion of the attack color (0,255,0 <-> 255,0,255 by default) and is
+  // never set directly — only previewed.
+  function hexToRgb(hex){
+    const h = hex.replace('#','');
+    return { r: parseInt(h.substring(0,2),16), g: parseInt(h.substring(2,4),16), b: parseInt(h.substring(4,6),16) };
+  }
+  function rgbToHex(r,g,b){
+    return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+  }
+  function applyAttackColor(hex){
+    const { r, g, b } = hexToRgb(hex);
+    const ir = 255 - r, ig = 255 - g, ib = 255 - b;
+    document.documentElement.style.setProperty('--dodge-green', `rgb(${r},${g},${b})`);
+    document.documentElement.style.setProperty('--feint-magenta', `rgb(${ir},${ig},${ib})`);
+    document.getElementById('attackColorHexLabel').textContent = `${hex} (rgb ${r},${g},${b})`;
+    document.getElementById('feintColorSwatch').style.background = `rgb(${ir},${ig},${ib})`;
+    document.getElementById('feintColorHexLabel').textContent = `${rgbToHex(ir,ig,ib)} (rgb ${ir},${ig},${ib})`;
+  }
+  document.getElementById('attackColorInput').addEventListener('input', (e)=> applyAttackColor(e.target.value));
+  document.getElementById('resetColorBtn').addEventListener('click', ()=>{
+    document.getElementById('attackColorInput').value = '#00ff00';
+    applyAttackColor('#00ff00');
+  });
+  applyAttackColor('#00ff00');
+
   // ---------------- default settings ----------------
   const DEFAULT_SETTINGS = {
     idleWait:   [900, 3200],
     feintAudio: false,
-    heavy:      { enabled: true, windowMin: 700, windowMax: 1200, perfectMs: 300 },
-    jab:        { enabled: true, windowMin: 320, windowMax: 600,  perfectMs: 150 },
-    heavyFeint: { enabled: true, fakeHoldMin: 350, fakeHoldMax: 900, windowMin: 320, windowMax: 600, perfectMs: 150 },
-    jabFeint:   { enabled: true, fakeHoldMin: 350, fakeHoldMax: 900, windowMin: 700, windowMax: 1200, perfectMs: 300 }
+    preFireEnabled:     true,  // dodging before the cue even appears is allowed
+    preFirePunishFeint: true,  // ...but if the round turns out to be a feint, that early dodge gets you hit
+    preFireGraceMs:     700,   // a click only counts as a pre-fire if it lands within this many ms of the cue actually appearing; earlier clicks are ignored
+    counterEnabled:  false,    // reacting inside a slice of the perfect window counts as a COUNTER (best possible result)
+    counterFraction: 35,       // % of the perfect-cutoff that counts as a counter, e.g. 35% of 130ms jab-perfect = 45ms
+    degradationEnabled: false, // simulates UBG's backdash degradation: repeated dodging eventually makes feints undodgeable
+    degradationPerDodge: 20,   // points added per non-perfect dodge (matches the wiki's 20pts/backdash)
+    degradationRecoverPerPerfect: 6, // points removed per Perfect/Counter (matches the wiki's 6pts/landed starter punch)
+    degradationStage3: 60,     // at this many points, feints become impossible to dodge
+    feintWindowMult:  1.4,     // scales every feint's real-attack window & perfect cutoff — feints need more reaction room than a plain attack because you have to recognize the reveal first
+    feintStartupMult: 0.65,    // scales every feint's "too early" startup dead-zone down, so more of the window is actually usable
+    specialsEnabled:  false,   // toggle: let styles fire their signature special attacks
+    specialChanceMult: 100,    // % scaler applied on top of each style's own special-trigger chance
+    heavy:      { enabled: true, windowMin: 650, windowMax: 1150, perfectMs: 280, weight: 25 },
+    jab:        { enabled: true, windowMin: 280, windowMax: 550,  perfectMs: 130, weight: 25 },
+    heavyFeint: { enabled: true, fakeHoldMin: 250, fakeHoldMax: 650, startupMin: 40, startupMax: 90,  windowMin: 280, windowMax: 550,  perfectMs: 130, weight: 25 },
+    jabFeint:   { enabled: true, fakeHoldMin: 250, fakeHoldMax: 650, startupMin: 90, startupMax: 180, windowMin: 650, windowMax: 1150, perfectMs: 280, weight: 25 }
   };
 
   const cfg = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
   const ID = {
     idleMin:'idleMin', idleMax:'idleMax', feintAudio:'feintAudio',
-    heavyEnabled:'enableHeavy', heavyMin:'heavyMin', heavyMax:'heavyMax', heavyPerfect:'heavyPerfect',
-    jabEnabled:'enableJab', jabMin:'jabMin', jabMax:'jabMax', jabPerfect:'jabPerfect',
-    hfEnabled:'enableHeavyFeint', hfFakeMin:'hfFakeMin', hfFakeMax:'hfFakeMax', hfWinMin:'hfWinMin', hfWinMax:'hfWinMax', hfPerfect:'hfPerfect',
-    jfEnabled:'enableJabFeint', jfFakeMin:'jfFakeMin', jfFakeMax:'jfFakeMax', jfWinMin:'jfWinMin', jfWinMax:'jfWinMax', jfPerfect:'jfPerfect'
+    preFireEnabled:'preFireEnabled', preFirePunishFeint:'preFirePunishFeint', preFireGraceMs:'preFireGraceMs',
+    counterEnabled:'counterEnabled', counterFraction:'counterFraction',
+    degradationEnabled:'degradationEnabled', degradationPerDodge:'degradationPerDodge',
+    degradationRecoverPerPerfect:'degradationRecoverPerPerfect', degradationStage3:'degradationStage3',
+    feintWindowMult:'feintWindowMult', feintStartupMult:'feintStartupMult',
+    specialsEnabled:'specialsEnabled', specialChanceMult:'specialChanceMult',
+    heavyEnabled:'enableHeavy', heavyMin:'heavyMin', heavyMax:'heavyMax', heavyPerfect:'heavyPerfect', heavyWeight:'heavyWeight',
+    jabEnabled:'enableJab', jabMin:'jabMin', jabMax:'jabMax', jabPerfect:'jabPerfect', jabWeight:'jabWeight',
+    hfEnabled:'enableHeavyFeint', hfFakeMin:'hfFakeMin', hfFakeMax:'hfFakeMax', hfStartMin:'hfStartMin', hfStartMax:'hfStartMax', hfWinMin:'hfWinMin', hfWinMax:'hfWinMax', hfPerfect:'hfPerfect', hfWeight:'hfWeight',
+    jfEnabled:'enableJabFeint', jfFakeMin:'jfFakeMin', jfFakeMax:'jfFakeMax', jfStartMin:'jfStartMin', jfStartMax:'jfStartMax', jfWinMin:'jfWinMin', jfWinMax:'jfWinMax', jfPerfect:'jfPerfect', jfWeight:'jfWeight'
   };
   const $ = id => document.getElementById(id);
 
   function readCfgFromInputs(){
     cfg.idleWait = [+$(ID.idleMin).value, +$(ID.idleMax).value];
     cfg.feintAudio = $(ID.feintAudio).checked;
+    cfg.preFireEnabled = $(ID.preFireEnabled).checked;
+    cfg.preFirePunishFeint = $(ID.preFirePunishFeint).checked;
+    cfg.preFireGraceMs = +$(ID.preFireGraceMs).value;
+    cfg.counterEnabled = $(ID.counterEnabled).checked;
+    cfg.counterFraction = +$(ID.counterFraction).value;
+    cfg.degradationEnabled = $(ID.degradationEnabled).checked;
+    cfg.degradationPerDodge = +$(ID.degradationPerDodge).value;
+    cfg.degradationRecoverPerPerfect = +$(ID.degradationRecoverPerPerfect).value;
+    cfg.degradationStage3 = +$(ID.degradationStage3).value;
+    cfg.feintWindowMult = +$(ID.feintWindowMult).value;
+    cfg.feintStartupMult = +$(ID.feintStartupMult).value;
+    cfg.specialsEnabled = $(ID.specialsEnabled).checked;
+    cfg.specialChanceMult = +$(ID.specialChanceMult).value;
 
-    cfg.heavy = { enabled: $(ID.heavyEnabled).checked, windowMin: +$(ID.heavyMin).value, windowMax: +$(ID.heavyMax).value, perfectMs: +$(ID.heavyPerfect).value };
-    cfg.jab   = { enabled: $(ID.jabEnabled).checked,   windowMin: +$(ID.jabMin).value,   windowMax: +$(ID.jabMax).value,   perfectMs: +$(ID.jabPerfect).value };
+    cfg.heavy = { enabled: $(ID.heavyEnabled).checked, windowMin: +$(ID.heavyMin).value, windowMax: +$(ID.heavyMax).value, perfectMs: +$(ID.heavyPerfect).value, weight: +$(ID.heavyWeight).value };
+    cfg.jab   = { enabled: $(ID.jabEnabled).checked,   windowMin: +$(ID.jabMin).value,   windowMax: +$(ID.jabMax).value,   perfectMs: +$(ID.jabPerfect).value, weight: +$(ID.jabWeight).value };
 
-    cfg.heavyFeint = { enabled: $(ID.hfEnabled).checked, fakeHoldMin: +$(ID.hfFakeMin).value, fakeHoldMax: +$(ID.hfFakeMax).value, windowMin: +$(ID.hfWinMin).value, windowMax: +$(ID.hfWinMax).value, perfectMs: +$(ID.hfPerfect).value };
-    cfg.jabFeint   = { enabled: $(ID.jfEnabled).checked, fakeHoldMin: +$(ID.jfFakeMin).value, fakeHoldMax: +$(ID.jfFakeMax).value, windowMin: +$(ID.jfWinMin).value, windowMax: +$(ID.jfWinMax).value, perfectMs: +$(ID.jfPerfect).value };
+    cfg.heavyFeint = { enabled: $(ID.hfEnabled).checked, fakeHoldMin: +$(ID.hfFakeMin).value, fakeHoldMax: +$(ID.hfFakeMax).value, startupMin: +$(ID.hfStartMin).value, startupMax: +$(ID.hfStartMax).value, windowMin: +$(ID.hfWinMin).value, windowMax: +$(ID.hfWinMax).value, perfectMs: +$(ID.hfPerfect).value, weight: +$(ID.hfWeight).value };
+    cfg.jabFeint   = { enabled: $(ID.jfEnabled).checked, fakeHoldMin: +$(ID.jfFakeMin).value, fakeHoldMax: +$(ID.jfFakeMax).value, startupMin: +$(ID.jfStartMin).value, startupMax: +$(ID.jfStartMax).value, windowMin: +$(ID.jfWinMin).value, windowMax: +$(ID.jfWinMax).value, perfectMs: +$(ID.jfPerfect).value, weight: +$(ID.jfWeight).value };
   }
 
   function applySettingsToInputs(s){
     $(ID.idleMin).value = s.idleWait[0]; $(ID.idleMax).value = s.idleWait[1];
     $(ID.feintAudio).checked = !!s.feintAudio;
+    $(ID.preFireEnabled).checked = s.preFireEnabled !== false;
+    $(ID.preFirePunishFeint).checked = s.preFirePunishFeint !== false;
+    $(ID.preFireGraceMs).value = s.preFireGraceMs ?? 700;
+    $(ID.counterEnabled).checked = !!s.counterEnabled;
+    $(ID.counterFraction).value = s.counterFraction ?? 35;
+    $(ID.degradationEnabled).checked = !!s.degradationEnabled;
+    $(ID.degradationPerDodge).value = s.degradationPerDodge ?? 20;
+    $(ID.degradationRecoverPerPerfect).value = s.degradationRecoverPerPerfect ?? 6;
+    $(ID.degradationStage3).value = s.degradationStage3 ?? 60;
+    $(ID.feintWindowMult).value = s.feintWindowMult ?? 1.4;
+    $(ID.feintStartupMult).value = s.feintStartupMult ?? 0.65;
+    $(ID.specialsEnabled).checked = !!s.specialsEnabled;
+    $(ID.specialChanceMult).value = s.specialChanceMult ?? 100;
 
     $(ID.heavyEnabled).checked = s.heavy.enabled !== false;
     $(ID.heavyMin).value = s.heavy.windowMin; $(ID.heavyMax).value = s.heavy.windowMax; $(ID.heavyPerfect).value = s.heavy.perfectMs;
+    $(ID.heavyWeight).value = s.heavy.weight ?? 25; document.getElementById('heavyWeightN').textContent = $(ID.heavyWeight).value;
 
     $(ID.jabEnabled).checked = s.jab.enabled !== false;
     $(ID.jabMin).value = s.jab.windowMin; $(ID.jabMax).value = s.jab.windowMax; $(ID.jabPerfect).value = s.jab.perfectMs;
+    $(ID.jabWeight).value = s.jab.weight ?? 25; document.getElementById('jabWeightN').textContent = $(ID.jabWeight).value;
 
     $(ID.hfEnabled).checked = s.heavyFeint.enabled !== false;
     $(ID.hfFakeMin).value = s.heavyFeint.fakeHoldMin; $(ID.hfFakeMax).value = s.heavyFeint.fakeHoldMax;
+    $(ID.hfStartMin).value = s.heavyFeint.startupMin ?? 40; $(ID.hfStartMax).value = s.heavyFeint.startupMax ?? 90;
     $(ID.hfWinMin).value = s.heavyFeint.windowMin; $(ID.hfWinMax).value = s.heavyFeint.windowMax; $(ID.hfPerfect).value = s.heavyFeint.perfectMs;
+    $(ID.hfWeight).value = s.heavyFeint.weight ?? 25; document.getElementById('hfWeightN').textContent = $(ID.hfWeight).value;
 
     $(ID.jfEnabled).checked = s.jabFeint.enabled !== false;
     $(ID.jfFakeMin).value = s.jabFeint.fakeHoldMin; $(ID.jfFakeMax).value = s.jabFeint.fakeHoldMax;
+    $(ID.jfStartMin).value = s.jabFeint.startupMin ?? 90; $(ID.jfStartMax).value = s.jabFeint.startupMax ?? 180;
     $(ID.jfWinMin).value = s.jabFeint.windowMin; $(ID.jfWinMax).value = s.jabFeint.windowMax; $(ID.jfPerfect).value = s.jabFeint.perfectMs;
+    $(ID.jfWeight).value = s.jabFeint.weight ?? 25; document.getElementById('jfWeightN').textContent = $(ID.jfWeight).value;
 
     readCfgFromInputs();
   }
 
   document.querySelectorAll('.settings input[type=number]').forEach(el => el.addEventListener('change', readCfgFromInputs));
   document.querySelectorAll('.settings input[type=checkbox]').forEach(el => el.addEventListener('change', readCfgFromInputs));
+  document.querySelectorAll('.settings input[type=range]').forEach(el => el.addEventListener('input', ()=>{
+    document.getElementById(el.id + 'N').textContent = el.value;
+    readCfgFromInputs();
+  }));
 
   document.getElementById('toggleNormalBtn').addEventListener('click', ()=>{
     const on = !( $(ID.heavyEnabled).checked || $(ID.jabEnabled).checked );
@@ -481,7 +673,21 @@
   });
 
   // ---------------- presets ----------------
-  let presets = { "Default": DEFAULT_SETTINGS };
+  function mk(overrides){
+    const s = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+    Object.keys(overrides).forEach(k=>{
+      if (typeof overrides[k] === 'object' && !Array.isArray(overrides[k])) Object.assign(s[k], overrides[k]);
+      else s[k] = overrides[k];
+    });
+    return s;
+  }
+  let presets = {
+    "Default": DEFAULT_SETTINGS,
+    "Hardcore (full ruleset)": mk({
+      counterEnabled: true, counterFraction: 30,
+      degradationEnabled: true, degradationPerDodge: 20, degradationRecoverPerPerfect: 6, degradationStage3: 60
+    })
+  };
   const presetSelect = document.getElementById('presetSelect');
 
   function refreshPresetDropdown(selectName){
@@ -510,7 +716,8 @@
 
   document.getElementById('exportSettingsBtn').addEventListener('click', ()=>{
     readCfgFromInputs();
-    const blob = new Blob([JSON.stringify(cfg, null, 2)], {type:'application/json'});
+    const payload = Object.assign({}, cfg, { attackColorHex: document.getElementById('attackColorInput').value });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -533,6 +740,10 @@
         presets[name] = parsed;
         refreshPresetDropdown(name);
         applySettingsToInputs(parsed);
+        if (parsed.attackColorHex) {
+          document.getElementById('attackColorInput').value = parsed.attackColorHex;
+          applyAttackColor(parsed.attackColorHex);
+        }
       } catch(err){
         alert("That file doesn't look like a valid UBG settings export.");
       }
@@ -542,6 +753,466 @@
   });
 
   function rand(min, max){ return Math.random() * (max - min) + min; }
+
+  // ---------------- UBG fighting styles ----------------
+  // Untitled Boxing Game doesn't publish exact frame/ms data. Each entry below is a reasoned translation
+  // of that style's documented relative speed/power (official wiki move descriptions + community tier-list
+  // writeups, Sept 2026 meta) onto this trainer's timing model: faster/lighter styles get tighter windows
+  // and lower perfect cutoffs, slower/heavier styles get longer ones. This covers all 9 current Legendary
+  // styles and all 6 current Mythic styles — the two rarities you asked for. Treat these as close, carefully
+  // reasoned approximations, not official numbers.
+  const STYLE_PRESETS = {
+    "Ghost": {
+      rarity: "Legendary",
+      desc: "S-tier. Famous for a near-instant jab ('Ghost Jab') and strong evasion; heavy is comparatively unremarkable.",
+      s: mk({
+        jab:        { windowMin: 140, windowMax: 260, perfectMs: 60 },
+        heavy:      { windowMin: 700, windowMax: 1200, perfectMs: 300 },
+        heavyFeint: { fakeHoldMin: 150, fakeHoldMax: 380, startupMin: 30, startupMax: 70,  windowMin: 140, windowMax: 260, perfectMs: 60 },
+        jabFeint:   { fakeHoldMin: 250, fakeHoldMax: 650, startupMin: 100, startupMax: 200, windowMin: 700, windowMax: 1200, perfectMs: 300 }
+      })
+    },
+    "White Ash": {
+      rarity: "Legendary",
+      desc: "S-tier, highest damage ceiling in the game (4 stocks instead of 3, lowest HP). Well-rounded, with a heavy noticeably faster than most 'good heavy speed' styles.",
+      s: mk({
+        jab:        { windowMin: 260, windowMax: 500, perfectMs: 120 },
+        heavy:      { windowMin: 550, windowMax: 1000, perfectMs: 230 },
+        heavyFeint: { fakeHoldMin: 220, fakeHoldMax: 580, startupMin: 40, startupMax: 90,  windowMin: 260, windowMax: 500, perfectMs: 120 },
+        jabFeint:   { fakeHoldMin: 220, fakeHoldMax: 580, startupMin: 70, startupMax: 150, windowMin: 550, windowMax: 1000, perfectMs: 230 }
+      })
+    },
+    "Hitman": {
+      rarity: "Mythic",
+      desc: "A-tier. The 'flicker jab' has a very short windup and is the style's entire identity — but per the wiki, its M2 heavy is explicitly slow and predictable, the tradeoff for that jab speed.",
+      s: mk({
+        jab:        { windowMin: 150, windowMax: 280, perfectMs: 60 },
+        heavy:      { windowMin: 850, windowMax: 1450, perfectMs: 380 },
+        heavyFeint: { fakeHoldMin: 150, fakeHoldMax: 380, startupMin: 25, startupMax: 60,  windowMin: 150, windowMax: 280, perfectMs: 60 },
+        jabFeint:   { fakeHoldMin: 350, fakeHoldMax: 850, startupMin: 170, startupMax: 300, windowMin: 850, windowMax: 1450, perfectMs: 380 }
+      })
+    },
+    "Slugger": {
+      rarity: "Legendary",
+      desc: "A-tier. Hits the hardest in the game; the heavy is charged by holding it, so how long you charge changes the timing as much as the damage. Use the charge slider below to dial this in.",
+      s: mk({
+        jab:        { windowMin: 350, windowMax: 650, perfectMs: 170 },
+        heavy:      { windowMin: 1000, windowMax: 1700, perfectMs: 450 },
+        heavyFeint: { fakeHoldMin: 300, fakeHoldMax: 750, startupMin: 60, startupMax: 130, windowMin: 350, windowMax: 650, perfectMs: 170 },
+        jabFeint:   { fakeHoldMin: 300, fakeHoldMax: 750, startupMin: 140, startupMax: 260, windowMin: 1000, windowMax: 1700, perfectMs: 450 }
+      })
+    },
+    "Iron Fist": {
+      rarity: "Legendary",
+      desc: "A-tier endurance/power pick. Ridiculous heavies and durable block, paid for with self-damage on raw heavies — slow and deliberate throughout.",
+      s: mk({
+        jab:        { windowMin: 380, windowMax: 700, perfectMs: 190 },
+        heavy:      { windowMin: 1050, windowMax: 1750, perfectMs: 470 },
+        heavyFeint: { fakeHoldMin: 320, fakeHoldMax: 780, startupMin: 65, startupMax: 140, windowMin: 380, windowMax: 700, perfectMs: 190 },
+        jabFeint:   { fakeHoldMin: 320, fakeHoldMax: 780, startupMin: 150, startupMax: 270, windowMin: 1050, windowMax: 1750, perfectMs: 470 }
+      })
+    },
+    "Wolf": {
+      rarity: "Mythic",
+      desc: "Best Mythic, textbook style with no major weaknesses. Its White Fang M2 lands two heavies in a row — the first is already the fastest heavy in the game, and the second, extremely-low-windup follow-up is faster still.",
+      s: mk({
+        jab:        { windowMin: 260, windowMax: 480, perfectMs: 120 },
+        heavy:      { windowMin: 360, windowMax: 700, perfectMs: 140 },
+        heavyFeint: { fakeHoldMin: 190, fakeHoldMax: 470, startupMin: 25, startupMax: 60,  windowMin: 260, windowMax: 480, perfectMs: 120 },
+        jabFeint:   { fakeHoldMin: 190, fakeHoldMax: 470, startupMin: 40, startupMax: 90,  windowMin: 360, windowMax: 700, perfectMs: 140 }
+      })
+    },
+    "Chronos": {
+      rarity: "Legendary",
+      desc: "A-tier specialist. The wiki explicitly notes lightning-fast hand speed and a rapid M1 chain, and that even its M2 stays fast enough to be hard to perfect-dodge — this is its normal-state speed; Focus mode buffs it further and isn't modeled here.",
+      s: mk({
+        jab:        { windowMin: 200, windowMax: 380, perfectMs: 90 },
+        heavy:      { windowMin: 500, windowMax: 900, perfectMs: 210 },
+        heavyFeint: { fakeHoldMin: 180, fakeHoldMax: 450, startupMin: 30, startupMax: 70,  windowMin: 200, windowMax: 380, perfectMs: 90 },
+        jabFeint:   { fakeHoldMin: 180, fakeHoldMax: 450, startupMin: 65, startupMax: 130, windowMin: 500, windowMax: 900, perfectMs: 210 }
+      })
+    },
+    "Hawk": {
+      rarity: "Legendary",
+      desc: "A-tier. Lightning-fast combos and relentless pressure, escalating Base → Bloodlust → Ecstasy on its Rage Meter — fast jabs throughout.",
+      s: mk({
+        jab:        { windowMin: 190, windowMax: 360, perfectMs: 85 },
+        heavy:      { windowMin: 650, windowMax: 1150, perfectMs: 270 },
+        heavyFeint: { fakeHoldMin: 190, fakeHoldMax: 470, startupMin: 35, startupMax: 80,  windowMin: 190, windowMax: 360, perfectMs: 85 },
+        jabFeint:   { fakeHoldMin: 190, fakeHoldMax: 470, startupMin: 85, startupMax: 170, windowMin: 650, windowMax: 1150, perfectMs: 270 }
+      })
+    },
+    "Bullet": {
+      rarity: "Mythic",
+      desc: "Counter-focused mid-range brawler. The wiki's own style guide calls out Bullet's jab as 'Near-Instant' (same tier as Ghost's); its Thunderbolt heavy is the strongest heavy counterhit in the game but the raw M2 itself isn't fast.",
+      s: mk({
+        jab:        { windowMin: 140, windowMax: 260, perfectMs: 55 },
+        heavy:      { windowMin: 750, windowMax: 1300, perfectMs: 330 },
+        heavyFeint: { fakeHoldMin: 150, fakeHoldMax: 380, startupMin: 25, startupMax: 60,  windowMin: 140, windowMax: 260, perfectMs: 55 },
+        jabFeint:   { fakeHoldMin: 300, fakeHoldMax: 720, startupMin: 150, startupMax: 270, windowMin: 750, windowMax: 1300, perfectMs: 330 }
+      })
+    },
+    "Hands Low": {
+      rarity: "Mythic",
+      desc: "Grouped with Bullet and Hitman as speed-and-technical — fast, tight-margin punches thrown from an unconventional low guard.",
+      s: mk({
+        jab:        { windowMin: 200, windowMax: 380, perfectMs: 90 },
+        heavy:      { windowMin: 620, windowMax: 1080, perfectMs: 260 },
+        heavyFeint: { fakeHoldMin: 200, fakeHoldMax: 480, startupMin: 35, startupMax: 80,  windowMin: 200, windowMax: 380, perfectMs: 90 },
+        jabFeint:   { fakeHoldMin: 200, fakeHoldMax: 480, startupMin: 80, startupMax: 160, windowMin: 620, windowMax: 1080, perfectMs: 260 }
+      })
+    },
+    "Dempsey": {
+      rarity: "Mythic",
+      desc: "Pure in-fighter (the old 'Ippo'). Amazing punch power and dash speed at the cost of slow hand speed and no backdash — the Dempsey Roll is its signature.",
+      s: mk({
+        jab:        { windowMin: 320, windowMax: 600, perfectMs: 150 },
+        heavy:      { windowMin: 750, windowMax: 1300, perfectMs: 320 },
+        heavyFeint: { fakeHoldMin: 280, fakeHoldMax: 680, startupMin: 55, startupMax: 115, windowMin: 320, windowMax: 600, perfectMs: 150 },
+        jabFeint:   { fakeHoldMin: 280, fakeHoldMax: 680, startupMin: 110, startupMax: 210, windowMin: 750, windowMax: 1300, perfectMs: 320 }
+      })
+    },
+    "Shotgun": {
+      rarity: "Legendary",
+      desc: "Boxer-puncher with no real strengths or weaknesses. Its short uppercut gives it a notably faster heavy than most, at the cost of weak block and low overall damage.",
+      s: mk({
+        jab:        { windowMin: 300, windowMax: 560, perfectMs: 140 },
+        heavy:      { windowMin: 520, windowMax: 940, perfectMs: 210 },
+        heavyFeint: { fakeHoldMin: 260, fakeHoldMax: 640, startupMin: 45, startupMax: 95,  windowMin: 300, windowMax: 560, perfectMs: 140 },
+        jabFeint:   { fakeHoldMin: 260, fakeHoldMax: 640, startupMin: 60, startupMax: 120, windowMin: 520, windowMax: 940, perfectMs: 210 }
+      })
+    },
+    "Freedom": {
+      rarity: "Legendary",
+      desc: "A-tier adaptive/unorthodox style built around switching plans mid-fight — balanced timing with a slight edge on the jab.",
+      s: mk({
+        jab:        { windowMin: 250, windowMax: 470, perfectMs: 115 },
+        heavy:      { windowMin: 640, windowMax: 1120, perfectMs: 270 },
+        heavyFeint: { fakeHoldMin: 230, fakeHoldMax: 580, startupMin: 40, startupMax: 90,  windowMin: 250, windowMax: 470, perfectMs: 115 },
+        jabFeint:   { fakeHoldMin: 230, fakeHoldMax: 580, startupMin: 90, startupMax: 180, windowMin: 640, windowMax: 1120, perfectMs: 270 }
+      })
+    },
+    "Switch Hit": {
+      rarity: "Mythic",
+      desc: "Unorthodox mix-up style with medium damage and surprisingly good range, at the cost of weak mobility — built to shut down counter/perfect-dodge fishing.",
+      s: mk({
+        jab:        { windowMin: 260, windowMax: 490, perfectMs: 120 },
+        heavy:      { windowMin: 660, windowMax: 1140, perfectMs: 275 },
+        heavyFeint: { fakeHoldMin: 240, fakeHoldMax: 600, startupMin: 40, startupMax: 90,  windowMin: 260, windowMax: 490, perfectMs: 120 },
+        jabFeint:   { fakeHoldMin: 240, fakeHoldMax: 600, startupMin: 90, startupMax: 185, windowMin: 660, windowMax: 1140, perfectMs: 275 }
+      })
+    },
+    "Supernova": {
+      rarity: "Legendary",
+      desc: "Rushdown infighter and 'speedster' — increased move speed and fast dashes, with fast (but one-sided, easily perfect-dodged) light attacks. Weak block; relies on Comet/Eject/Re-Entry more than raw M2 power.",
+      s: mk({
+        jab:        { windowMin: 190, windowMax: 350, perfectMs: 85 },
+        heavy:      { windowMin: 640, windowMax: 1120, perfectMs: 270 },
+        heavyFeint: { fakeHoldMin: 190, fakeHoldMax: 470, startupMin: 35, startupMax: 80,  windowMin: 190, windowMax: 350, perfectMs: 85 },
+        jabFeint:   { fakeHoldMin: 190, fakeHoldMax: 470, startupMin: 85, startupMax: 170, windowMin: 640, windowMax: 1120, perfectMs: 270 }
+      })
+    },
+    "Deimos": {
+      rarity: "Legendary",
+      desc: "Brand new (Sept 12, 2026) — an all-or-nothing glass cannon: punches inflict Bleed, and landing hits fills a Terror meter into MONSTROSITY Mode, but getting hit drains it. So new that detailed speed data isn't documented yet; modeled here as fast and aggressive, matching its 'must never get hit' identity — treat as our roughest estimate of the bunch.",
+      s: mk({
+        jab:        { windowMin: 200, windowMax: 380, perfectMs: 90 },
+        heavy:      { windowMin: 600, windowMax: 1050, perfectMs: 250 },
+        heavyFeint: { fakeHoldMin: 190, fakeHoldMax: 470, startupMin: 35, startupMax: 80,  windowMin: 200, windowMax: 380, perfectMs: 90 },
+        jabFeint:   { fakeHoldMin: 190, fakeHoldMax: 470, startupMin: 80, startupMax: 160, windowMin: 600, windowMax: 1050, perfectMs: 250 }
+      })
+    },
+    "Surgeon": {
+      rarity: "Mythic",
+      desc: "Newest Mythic (Aug 17, 2026). 'Fast, weak attacks' per its own wiki entry, with an otherwise rounded stat spread — its real identity is the Pinpoint debuff system (Head/Chest/Liver), not raw punch speed.",
+      s: mk({
+        jab:        { windowMin: 210, windowMax: 390, perfectMs: 95 },
+        heavy:      { windowMin: 680, windowMax: 1180, perfectMs: 290 },
+        heavyFeint: { fakeHoldMin: 200, fakeHoldMax: 490, startupMin: 35, startupMax: 80,  windowMin: 210, windowMax: 390, perfectMs: 95 },
+        jabFeint:   { fakeHoldMin: 200, fakeHoldMax: 490, startupMin: 90, startupMax: 175, windowMin: 680, windowMax: 1180, perfectMs: 290 }
+      })
+    },
+    "Dragonfish": {
+      rarity: "Rare",
+      desc: "The Kimura rework. Fast and fluid, built on mobility, pressure and continuous offense — relies more on speed and positioning than raw knockout power.",
+      s: mk({
+        jab:        { windowMin: 220, windowMax: 400, perfectMs: 100 },
+        heavy:      { windowMin: 600, windowMax: 1050, perfectMs: 250 },
+        heavyFeint: { fakeHoldMin: 210, fakeHoldMax: 520, startupMin: 40, startupMax: 85,  windowMin: 220, windowMax: 400, perfectMs: 100 },
+        jabFeint:   { fakeHoldMin: 210, fakeHoldMax: 520, startupMin: 90, startupMax: 175, windowMin: 600, windowMax: 1050, perfectMs: 250 }
+      })
+    },
+    "Charge": {
+      rarity: "Rare",
+      desc: "Hyper-aggressive, well-rounded in-fighter with no backdash and a very strong forward dash — its Stampede ability delivers the real damage, so the base kit itself is powerful but not especially fast.",
+      s: mk({
+        jab:        { windowMin: 300, windowMax: 560, perfectMs: 145 },
+        heavy:      { windowMin: 850, windowMax: 1450, perfectMs: 380 },
+        heavyFeint: { fakeHoldMin: 270, fakeHoldMax: 660, startupMin: 55, startupMax: 115, windowMin: 300, windowMax: 560, perfectMs: 145 },
+        jabFeint:   { fakeHoldMin: 270, fakeHoldMax: 660, startupMin: 130, startupMax: 250, windowMin: 850, windowMax: 1450, perfectMs: 380 }
+      })
+    },
+    "Trickster": {
+      rarity: "Rare",
+      desc: "Unorthodox, dash-centric style — its exceptional stat is mobility, not punch speed, so attacks sit close to baseline.",
+      s: mk({
+        jab:        { windowMin: 300, windowMax: 560, perfectMs: 140 },
+        heavy:      { windowMin: 700, windowMax: 1200, perfectMs: 300 },
+        heavyFeint: { fakeHoldMin: 260, fakeHoldMax: 650, startupMin: 45, startupMax: 100, windowMin: 300, windowMax: 560, perfectMs: 140 },
+        jabFeint:   { fakeHoldMin: 260, fakeHoldMax: 650, startupMin: 95, startupMax: 195, windowMin: 700, windowMax: 1200, perfectMs: 300 }
+      })
+    },
+    "Hammer": {
+      rarity: "Rare",
+      desc: "Wiki-documented as similar to Basic in damage, but with weak dashes and 'slightly slower attacks' — its Body Blow ability is the real threat, not its raw punch speed.",
+      s: mk({
+        jab:        { windowMin: 330, windowMax: 620, perfectMs: 155 },
+        heavy:      { windowMin: 750, windowMax: 1300, perfectMs: 330 },
+        heavyFeint: { fakeHoldMin: 280, fakeHoldMax: 680, startupMin: 50, startupMax: 105, windowMin: 330, windowMax: 620, perfectMs: 155 },
+        jabFeint:   { fakeHoldMin: 280, fakeHoldMax: 680, startupMin: 115, startupMax: 220, windowMin: 750, windowMax: 1300, perfectMs: 330 }
+      })
+    },
+    "Corkscrew": {
+      rarity: "Rare",
+      desc: "In-fighter with fast health/stamina/block regen. Its signature Corkscrew Punch M2 explicitly has a slower startup in exchange for high damage and range.",
+      s: mk({
+        jab:        { windowMin: 290, windowMax: 540, perfectMs: 135 },
+        heavy:      { windowMin: 950, windowMax: 1600, perfectMs: 420 },
+        heavyFeint: { fakeHoldMin: 250, fakeHoldMax: 610, startupMin: 45, startupMax: 95,  windowMin: 290, windowMax: 540, perfectMs: 135 },
+        jabFeint:   { fakeHoldMin: 250, fakeHoldMax: 610, startupMin: 150, startupMax: 270, windowMin: 950, windowMax: 1600, perfectMs: 420 }
+      })
+    },
+    "Basic": {
+      rarity: "Uncommon",
+      desc: "The starting style and the neutral baseline everything else is measured against — clean fundamentals, no crutches.",
+      s: mk({})
+    },
+    "Smash": {
+      rarity: "Uncommon",
+      desc: "All-Rounder Brawler — high-damage M1 and M2 with great shield damage, at the cost of documented 'slow punches and bad dashes.'",
+      s: mk({
+        jab:        { windowMin: 380, windowMax: 680, perfectMs: 190 },
+        heavy:      { windowMin: 1000, windowMax: 1650, perfectMs: 440 },
+        heavyFeint: { fakeHoldMin: 330, fakeHoldMax: 800, startupMin: 60, startupMax: 125, windowMin: 380, windowMax: 680, perfectMs: 190 },
+        jabFeint:   { fakeHoldMin: 330, fakeHoldMax: 800, startupMin: 140, startupMax: 260, windowMin: 1000, windowMax: 1650, perfectMs: 440 }
+      })
+    },
+    "Long Guard": {
+      rarity: "Uncommon",
+      desc: "Passive out-boxer built around range and whiff-punishing — the only style with whiff counters. Deliberate and patient rather than fast.",
+      s: mk({
+        jab:        { windowMin: 320, windowMax: 600, perfectMs: 150 },
+        heavy:      { windowMin: 750, windowMax: 1300, perfectMs: 320 },
+        heavyFeint: { fakeHoldMin: 280, fakeHoldMax: 680, startupMin: 50, startupMax: 105, windowMin: 320, windowMax: 600, perfectMs: 150 },
+        jabFeint:   { fakeHoldMin: 280, fakeHoldMax: 680, startupMin: 110, startupMax: 215, windowMin: 750, windowMax: 1300, perfectMs: 320 }
+      })
+    },
+    "Counter": {
+      rarity: "Uncommon",
+      desc: "Textbook counter-puncher — wiki-documented as having weak punches but 'good dashes and hand speed,' so the jab is quick even though it doesn't hit hard.",
+      s: mk({
+        jab:        { windowMin: 210, windowMax: 390, perfectMs: 95 },
+        heavy:      { windowMin: 700, windowMax: 1200, perfectMs: 300 },
+        heavyFeint: { fakeHoldMin: 190, fakeHoldMax: 470, startupMin: 35, startupMax: 80,  windowMin: 210, windowMax: 390, perfectMs: 95 },
+        jabFeint:   { fakeHoldMin: 190, fakeHoldMax: 470, startupMin: 95, startupMax: 190, windowMin: 700, windowMax: 1200, perfectMs: 300 }
+      })
+    },
+    "Turtle": {
+      rarity: "Uncommon",
+      desc: "Definition of a tank — incredibly powerful, fast-recovering block, very weak dashes. Wiki notes its M1s match Basic's; this models it as a slow, patient mover overall.",
+      s: mk({
+        jab:        { windowMin: 300, windowMax: 580, perfectMs: 140 },
+        heavy:      { windowMin: 800, windowMax: 1400, perfectMs: 340 },
+        heavyFeint: { fakeHoldMin: 270, fakeHoldMax: 650, startupMin: 50, startupMax: 105, windowMin: 300, windowMax: 580, perfectMs: 140 },
+        jabFeint:   { fakeHoldMin: 270, fakeHoldMax: 650, startupMin: 120, startupMax: 230, windowMin: 800, windowMax: 1400, perfectMs: 340 }
+      })
+    }
+  };
+
+  // ---------------- Style special attacks (toggleable) ----------------
+  // Two archetypes, matched to how each style's real ability actually behaves:
+  //  - "onHitBonus": landing a hit builds the style's meter/rhythm, so a fast follow-up attack can chain
+  //    immediately — e.g. Wolf's White Fang firing right after a connecting M1 or M2. Hard, but dodgeable.
+  //  - "hardTell": the style occasionally throws an unusually fast/unreadable version of its normal punch
+  //    (Ghost Jab, Body Blow, a flicker jab) — same attack type, tightened window, no advance warning.
+  // Only styles with a documented ability that reduces to one of those two shapes are listed; the rest
+  // (Basic, Smash, Long Guard, Turtle, Corkscrew, Trickster, Iron Fist, White Ash, Freedom, Hands Low,
+  // Surgeon — and Slugger, whose special IS the charge slider above) don't get a fabricated one, since
+  // their real mechanic is a meter/buff/debuff system that doesn't translate to a single bonus round.
+  const SPECIALS = {
+    "Wolf": {
+      name: "White Fang", type: "onHitBonus", triggerOn: ["HEAVY","JAB"], chance: 35,
+      desc: "A landed M1 or M2 can chain straight into White Fang — the fastest heavy in the game. Hard to dodge, but dodgeable.",
+      bonus: { style: "HEAVY", windowMin: 220, windowMax: 380, perfectMs: 90 }
+    },
+    "Ghost": {
+      name: "Ghost Jab", type: "hardTell", triggerOn: ["JAB"], chance: 25,
+      desc: "Occasionally throws the real Ghost Jab — near-instant, no tell beyond the flash itself.",
+      tightenTo: { windowMin: 70, windowMax: 120, perfectMs: 30 }
+    },
+    "Hammer": {
+      name: "Body Blow", type: "hardTell", triggerOn: ["HEAVY"], chance: 30,
+      desc: "A guard-breaking Body Blow — the wiki notes its dodge window is explicitly tighter than a normal heavy's.",
+      tightenTo: { windowMin: 420, windowMax: 650, perfectMs: 180 }
+    },
+    "Charge": {
+      name: "Stampede", type: "onHitBonus", triggerOn: ["HEAVY","JAB"], chance: 30,
+      desc: "A landed hit can trigger Stampede — a fast flurry follow-up.",
+      bonus: { style: "JAB", windowMin: 180, windowMax: 300, perfectMs: 80 }
+    },
+    "Hawk": {
+      name: "Bloodlust", type: "onHitBonus", triggerOn: ["HEAVY","JAB"], chance: 30,
+      desc: "Landing hits escalates the Rage Meter into Bloodlust, chaining a faster follow-up attack.",
+      bonus: { style: "HEAVY", windowMin: 480, windowMax: 800, perfectMs: 210 }
+    },
+    "Deimos": {
+      name: "Monstrosity", type: "onHitBonus", triggerOn: ["HEAVY","JAB"], chance: 30,
+      desc: "Landing hits fills the Terror meter — enough of it can trigger MONSTROSITY Mode for a vicious follow-up.",
+      bonus: { style: "HEAVY", windowMin: 200, windowMax: 340, perfectMs: 85 }
+    },
+    "Supernova": {
+      name: "Starstruck", type: "onHitBonus", triggerOn: ["HEAVY","JAB"], chance: 28,
+      desc: "Landed punches charge the Starstruck meter toward Comet — approximated here as a fast follow-up chance.",
+      bonus: { style: "HEAVY", windowMin: 460, windowMax: 780, perfectMs: 200 }
+    },
+    "Dragonfish": {
+      name: "Dragonfish Blow", type: "onHitBonus", triggerOn: ["HEAVY","JAB"], chance: 25,
+      desc: "Landed hits build Submerge — once charged, the finishing Dragonfish Blow can chain in immediately.",
+      bonus: { style: "HEAVY", windowMin: 440, windowMax: 760, perfectMs: 195 }
+    },
+    "Bullet": {
+      name: "Bullet Jab", type: "hardTell", triggerOn: ["JAB"], chance: 25,
+      desc: "The wiki calls this jab 'Near-Instant' — same tier as Ghost's. Occasionally it lives up to that.",
+      tightenTo: { windowMin: 65, windowMax: 110, perfectMs: 28 }
+    },
+    "Counter": {
+      name: "Counter Burst", type: "hardTell", triggerOn: ["JAB"], chance: 25,
+      desc: "Weak on paper, but the wiki credits Counter with unusually good hand speed — this is that burst.",
+      tightenTo: { windowMin: 100, windowMax: 170, perfectMs: 45 }
+    },
+    "Hitman": {
+      name: "Flicker Jab", type: "hardTell", triggerOn: ["JAB"], chance: 25,
+      desc: "The already-fast flicker jab has a rare, even-less-readable variant.",
+      tightenTo: { windowMin: 80, windowMax: 140, perfectMs: 35 }
+    },
+    "Chronos": {
+      name: "Focus Burst", type: "onHitBonus", triggerOn: ["HEAVY","JAB"], chance: 25,
+      desc: "Punching is the slowest way to build Focus, but it still counts — enough of it unleashes a much faster burst.",
+      bonus: { style: "JAB", windowMin: 140, windowMax: 240, perfectMs: 60 }
+    },
+    "Shotgun": {
+      name: "Barrage", type: "hardTell", triggerOn: ["JAB"], chance: 25,
+      desc: "A rapid barrage variant of its normal jab.",
+      tightenTo: { windowMin: 180, windowMax: 320, perfectMs: 80 }
+    },
+    "Switch Hit": {
+      name: "Static", type: "hardTell", triggerOn: ["HEAVY"], chance: 22,
+      desc: "Static is built to disrupt rhythm and punish perfect-dodge fishing — modeled here as an occasional tighter heavy.",
+      tightenTo: { windowMin: 420, windowMax: 700, perfectMs: 190 }
+    },
+    "Dempsey": {
+      name: "Dempsey Roll", type: "onHitBonus", triggerOn: ["HEAVY","JAB"], chance: 30,
+      desc: "The signature bob-and-weave flurry — a landed hit can roll straight into the next one.",
+      bonus: { style: "JAB", windowMin: 200, windowMax: 340, perfectMs: 90 }
+    }
+  };
+
+  const styleSelect = document.getElementById('styleSelect');
+  const styleDesc = document.getElementById('styleDesc');
+  Object.keys(STYLE_PRESETS).forEach(name=>{
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = `${name} (${STYLE_PRESETS[name].rarity})`;
+    styleSelect.appendChild(opt);
+  });
+  function renderStyleDesc(name, prefix){
+    const entry = STYLE_PRESETS[name];
+    if (!entry) { styleDesc.textContent = ''; return; }
+    styleDesc.textContent = `${prefix || ''}[${entry.rarity}] ${entry.desc}`;
+    document.getElementById('sluggerChargeRow').style.display = (name === 'Slugger') ? 'flex' : 'none';
+    const specialEl = document.getElementById('specialDesc');
+    const sp = SPECIALS[name];
+    if (sp) specialEl.textContent = `⚡ Special: ${sp.name} — ${sp.desc} (${sp.chance}% base chance, needs "Style special attacks" enabled below)`;
+    else if (name === 'Slugger') specialEl.textContent = `⚡ Special: the charge slider above IS Slugger's special mechanic.`;
+    else specialEl.textContent = `⚡ No special modeled for ${name} — its real ability is a meter/buff/debuff system that doesn't reduce to a single bonus dodge round.`;
+  }
+  renderStyleDesc(styleSelect.value);
+  styleSelect.addEventListener('change', ()=> renderStyleDesc(styleSelect.value));
+
+  let currentStyleName = styleSelect.value;
+  function loadStyle(name){
+    const entry = STYLE_PRESETS[name];
+    if (!entry) return;
+    currentStyleName = name;
+    styleSelect.value = name;
+    renderStyleDesc(name);
+    applySettingsToInputs(entry.s);
+    if (name === 'Slugger') applySluggerCharge();
+    setStyleBadge(`${name} (${entry.rarity})`);
+  }
+  document.getElementById('loadStyleBtn').addEventListener('click', ()=> loadStyle(styleSelect.value));
+  document.getElementById('randomStyleBtn').addEventListener('click', ()=>{
+    const names = Object.keys(STYLE_PRESETS);
+    const pick = names[Math.floor(Math.random() * names.length)];
+    loadStyle(pick);
+    renderStyleDesc(pick, '🎲 Rolled ');
+    setStyleBadge(`${pick} (${STYLE_PRESETS[pick].rarity}) — rolled`);
+  });
+
+  function setStyleBadge(text){ document.getElementById('styleBadge').textContent = 'Playing as: ' + text; }
+
+  // Any manual edit to Advanced Settings (while unlocked) means the badge no longer reflects an exact style.
+  document.querySelectorAll('.settings input').forEach(el=>{
+    el.addEventListener('input', ()=>{ if (!styleLocked) { setStyleBadge('Custom / Advanced Settings'); currentStyleName = null; } });
+  });
+
+  // ---------------- Style lock: use exact style timings vs. free-form Advanced Settings ----------------
+  let styleLocked = false;
+  function setStyleLock(locked){
+    styleLocked = locked;
+    document.querySelectorAll('.settings input, .settings select').forEach(el=>{ el.disabled = locked; });
+    if (locked) loadStyle(styleSelect.value); // snap to the exact currently-selected style, discarding any manual tweaks
+  }
+  document.getElementById('styleLock').addEventListener('change', (e)=> setStyleLock(e.target.checked));
+  document.getElementById('specialsEnabled').addEventListener('change', readCfgFromInputs);
+  document.getElementById('specialChanceMult').addEventListener('change', readCfgFromInputs);
+
+  // ---------------- Randomize style every round ----------------
+  function maybeRollRandomStyle(){
+    if (!document.getElementById('randomEveryRound').checked) return;
+    const names = Object.keys(STYLE_PRESETS);
+    const pick = names[Math.floor(Math.random() * names.length)];
+    loadStyle(pick);
+  }
+
+  // ---------------- Slugger charge slider ----------------
+  // Slugger's heavy is charged by holding the button — the longer the charge, the slower and harder-hitting
+  // the punch. This blends the heavy-related timings (including the heavy-styled feint legs) between a
+  // quick-release profile and a full-charge profile.
+  const SLUGGER_QUICK = { windowMin: 550,  windowMax: 900,  perfectMs: 220, fakeHoldMin: 200, fakeHoldMax: 450 };
+  const SLUGGER_FULL  = { windowMin: 1450, windowMax: 2200, perfectMs: 650, fakeHoldMin: 550, fakeHoldMax: 1150 };
+  function lerp(a, b, t){ return Math.round(a + (b - a) * t); }
+  function applySluggerCharge(){
+    const t = +document.getElementById('sluggerCharge').value / 100;
+    const win = {
+      windowMin: lerp(SLUGGER_QUICK.windowMin, SLUGGER_FULL.windowMin, t),
+      windowMax: lerp(SLUGGER_QUICK.windowMax, SLUGGER_FULL.windowMax, t),
+      perfectMs: lerp(SLUGGER_QUICK.perfectMs, SLUGGER_FULL.perfectMs, t)
+    };
+    const fake = {
+      fakeHoldMin: lerp(SLUGGER_QUICK.fakeHoldMin, SLUGGER_FULL.fakeHoldMin, t),
+      fakeHoldMax: lerp(SLUGGER_QUICK.fakeHoldMax, SLUGGER_FULL.fakeHoldMax, t)
+    };
+    // Heavy itself
+    $(ID.heavyMin).value = win.windowMin; $(ID.heavyMax).value = win.windowMax; $(ID.heavyPerfect).value = win.perfectMs;
+    // Heavy→Jab feint's fake leg is heavy-styled
+    $(ID.hfFakeMin).value = fake.fakeHoldMin; $(ID.hfFakeMax).value = fake.fakeHoldMax;
+    // Jab→Heavy feint's real (magenta) leg IS the charged heavy
+    $(ID.jfWinMin).value = win.windowMin; $(ID.jfWinMax).value = win.windowMax; $(ID.jfPerfect).value = win.perfectMs;
+    document.getElementById('sluggerChargeN').textContent = t < 0.15 ? 'Quick release' : t > 0.85 ? 'Full charge' : Math.round(t*100) + '%';
+    readCfgFromInputs();
+  }
+  document.getElementById('sluggerCharge').addEventListener('input', applySluggerCharge);
+
 
   // ---------------- audio ping (feint tell, optional) ----------------
   let actx = null;
@@ -567,6 +1238,23 @@
   let cueStart = 0;
   let currentRound = null;
   let listenersBound = false;
+  let preFired = false;
+  let preFireTime = 0;
+  let degradation = 0;
+
+  function degradationStage(){
+    if (degradation >= cfg.degradationStage3) return 3;
+    if (degradation >= cfg.degradationStage3 * (2/3)) return 2;
+    if (degradation >= cfg.degradationStage3 / 3) return 1;
+    return 0;
+  }
+  function applyDegradation(delta){
+    if (!cfg.degradationEnabled) return;
+    degradation = Math.max(0, degradation + delta);
+    const stage = degradationStage();
+    document.getElementById('tDegradation').textContent = stage
+      ? `Stage ${stage} (${Math.round(degradation)} pts)` : `${Math.round(degradation)} pts`;
+  }
 
   const arena = document.getElementById('arena');
   const promptText = document.getElementById('promptText');
@@ -585,9 +1273,9 @@
     arena.querySelectorAll('.outline-box').forEach(n=>n.remove());
     promptText.textContent = 'click / press space to begin';
   }
-  function setArenaSolid(color){ arena.className = 'arena solid' + (color === MAGENTA ? '-magenta' : ''); }
-  function setArenaOutline(color){
-    arena.className = 'arena';
+  function setArenaSolid(color, special){ arena.className = 'arena solid' + (color === MAGENTA ? '-magenta' : '') + (special ? ' special-flag' : ''); }
+  function setArenaOutline(color, special){
+    arena.className = 'arena' + (special ? ' special-flag' : '');
     const box = document.createElement('div');
     box.className = 'outline-box' + (color === MAGENTA ? ' magenta' : '');
     arena.appendChild(box);
@@ -610,35 +1298,124 @@
     return t;
   }
 
+  function pickWeightedType(){
+    const pool = [];
+    if (cfg.heavy.enabled) pool.push(['HEAVY', Math.max(0, cfg.heavy.weight)]);
+    if (cfg.jab.enabled) pool.push(['JAB', Math.max(0, cfg.jab.weight)]);
+    if (cfg.heavyFeint.enabled) pool.push(['HEAVY_FEINT', Math.max(0, cfg.heavyFeint.weight)]);
+    if (cfg.jabFeint.enabled) pool.push(['JAB_FEINT', Math.max(0, cfg.jabFeint.weight)]);
+    const total = pool.reduce((a,[,w])=>a+w, 0);
+    if (total <= 0) {
+      // every enabled type got weighted to zero — fall back to a plain uniform pick so the game doesn't stall
+      return pool.length ? pool[Math.floor(Math.random()*pool.length)][0] : null;
+    }
+    let r = Math.random() * total;
+    for (const [type, w] of pool) {
+      if (r < w) return type;
+      r -= w;
+    }
+    return pool[pool.length - 1][0];
+  }
+
   // ---------------- round flow ----------------
+  let nextRoundAt = 0;
   function scheduleNextRound(){
     phase = "idle";
+    preFired = false;
+    nextRoundAt = 0;
     hideResult();
     setArenaWhite();
     if (!running || paused) return;
     const wait = rand(cfg.idleWait[0], cfg.idleWait[1]);
+    nextRoundAt = performance.now() + wait;
     after(wait, startRound);
   }
 
   function startRound(){
     if (!running || paused) return;
+    maybeRollRandomStyle();
     const pool = enabledTypes();
     if (!pool.length) { alert('Enable at least one attack type to keep training.'); pauseGame(); return; }
 
     roundNum++;
     roundVal.textContent = roundNum;
-    const type = pool[Math.floor(Math.random() * pool.length)];
+    const type = pickWeightedType();
+    const isFeint = (type === "HEAVY_FEINT" || type === "JAB_FEINT");
 
     currentRound = {
       round: roundNum, type: type, style: null, color: null,
-      fakeHoldMs: null, window: null, perfectMs: null,
-      reactionMs: null, outcome: null, note: "", ts: new Date().toISOString()
+      fakeHoldMs: null, startupMs: null, window: null, perfectMs: null,
+      reactionMs: null, outcome: null, note: "", preFired: false, specialName: null, ts: new Date().toISOString()
     };
 
-    if (type === "HEAVY") beginReal("HEAVY", GREEN, cfg.heavy);
-    else if (type === "JAB") beginReal("JAB", GREEN, cfg.jab);
+    if (preFired && cfg.preFireEnabled) {
+      currentRound.preFired = true;
+      const earlyBy = performance.now() - preFireTime;
+      preFired = false;
+      if (isFeint && cfg.preFirePunishFeint) {
+        // The real attack's shape is the OPPOSITE of the fake: heavy-feint's real hit is a jab, jab-feint's real hit is a heavy.
+        currentRound.style = type === "HEAVY_FEINT" ? "JAB" : "HEAVY";
+        resolvePreFireHit(earlyBy);
+      } else if (!isFeint) {
+        currentRound.style = type;
+        resolvePreFireDodge(earlyBy);
+      } else {
+        // feint occurred but pre-fire punishment is turned off: ignore the early press, play the round normally
+        runRoundType(type);
+      }
+      return;
+    }
+
+    runRoundType(type);
+  }
+
+  function rollSpecialChance(chance){
+    return Math.random() * 100 < (chance * (cfg.specialChanceMult / 100));
+  }
+
+  function runRoundType(type){
+    let hardTell = null;
+    if (cfg.specialsEnabled && currentStyleName) {
+      const sp = SPECIALS[currentStyleName];
+      if (sp && sp.type === 'hardTell' && sp.triggerOn.includes(type) && rollSpecialChance(sp.chance)) hardTell = sp;
+    }
+    if (type === "HEAVY") beginReal("HEAVY", GREEN, hardTell ? { ...cfg.heavy, ...hardTell.tightenTo } : cfg.heavy, hardTell);
+    else if (type === "JAB") beginReal("JAB", GREEN, hardTell ? { ...cfg.jab, ...hardTell.tightenTo } : cfg.jab, hardTell);
     else if (type === "HEAVY_FEINT") beginFake("HEAVY", "JAB", cfg.heavyFeint);
     else if (type === "JAB_FEINT") beginFake("JAB", "HEAVY", cfg.jabFeint);
+  }
+
+  // Pre-fired before a normal attack's cue even appeared: still a successful dodge, just never "perfect".
+  // The arena still flashes the real attack's color so the result is never a mystery.
+  function resolvePreFireDodge(earlyBy){
+    phase = "resolved";
+    currentRound.outcome = "YELLOW";
+    currentRound.note = "pre-fired (early dodge)";
+    streak++;
+    streakVal.textContent = streak;
+    applyDegradation(cfg.degradationPerDodge);
+    if (currentRound.style === "HEAVY") setArenaSolid(GREEN); else setArenaOutline(GREEN);
+    showResult('normal', 'DODGED', `pre-fired ${Math.round(earlyBy)}ms early`);
+    data.push(Object.assign({}, currentRound));
+    logRow(currentRound);
+    updateStats();
+    after(950, scheduleNextRound);
+  }
+
+  // Pre-fired and it turned out to be a feint: caught mid-dodge, that's a hit.
+  // The arena flashes magenta in the real attack's shape so it's clear what actually landed.
+  function resolvePreFireHit(earlyBy){
+    phase = "resolved";
+    currentRound.outcome = "RED";
+    currentRound.note = "pre-fired into a feint";
+    streak = 0;
+    streakVal.textContent = streak;
+    if (currentRound.style === "HEAVY") setArenaSolid(MAGENTA); else setArenaOutline(MAGENTA);
+    showResult('miss', 'HIT', `pre-fired ${Math.round(earlyBy)}ms early into a feint`);
+    data.push(Object.assign({}, currentRound));
+    logRow(currentRound);
+    updateStats();
+    after(950, scheduleNextRound);
   }
 
   // Fake cue (green) -> straight to the real attack, colored magenta. No extra green stage.
@@ -658,18 +1435,27 @@
     });
   }
 
-  function beginReal(kind, color, settings){
+  function beginReal(kind, color, settings, specialDef){
     phase = "real";
     currentRound.style = kind;
     currentRound.color = color;
-    const windowMs = rand(settings.windowMin, settings.windowMax);
+    currentRound.specialName = specialDef ? specialDef.name : null;
+    const isFeintReal = (color === MAGENTA);
+    const windowMult = isFeintReal ? cfg.feintWindowMult : 1;
+    const windowMs = rand(settings.windowMin, settings.windowMax) * windowMult;
     currentRound.window = Math.round(windowMs);
-    currentRound.perfectMs = settings.perfectMs;
+    currentRound.perfectMs = Math.round(settings.perfectMs * windowMult);
     cueStart = performance.now();
 
-    if (color === MAGENTA) ping();
+    if (isFeintReal) {
+      ping();
+      currentRound.startupMs = (settings.startupMin != null) ? Math.round(rand(settings.startupMin, settings.startupMax) * cfg.feintStartupMult) : 0;
+      if (cfg.degradationEnabled && degradationStage() >= 3) currentRound.undodgeable = true;
+    } else {
+      currentRound.startupMs = 0;
+    }
 
-    if (kind === "HEAVY") setArenaSolid(color); else setArenaOutline(color);
+    if (kind === "HEAVY") setArenaSolid(color, !!specialDef); else setArenaOutline(color, !!specialDef);
 
     after(windowMs, ()=>{ if (phase === "real") resolveRound(null); });
   }
@@ -686,6 +1472,12 @@
       currentRound.note = "fooled by feint";
       streak = 0;
       showResult('miss', 'FOOLED', `reacted to the fake in ${Math.round(reactionMs)}ms`);
+    } else if (currentRound.undodgeable) {
+      currentRound.reactionMs = reactionMs;
+      currentRound.outcome = "RED";
+      currentRound.note = "hit — feint undodgeable (stage 3 degradation)";
+      streak = 0;
+      showResult('miss', 'HIT', "backdash too degraded to dodge this feint");
     } else {
       currentRound.reactionMs = reactionMs;
       if (reactionMs === null) {
@@ -693,13 +1485,25 @@
         currentRound.note = currentRound.note === "feint" ? "hit (after feint)" : "no dodge";
         streak = 0;
         showResult('miss', 'HIT', 'no dodge in time');
+      } else if (currentRound.startupMs && reactionMs < currentRound.startupMs) {
+        currentRound.outcome = "RED";
+        currentRound.note = "dodged too early — attack hadn't landed yet";
+        streak = 0;
+        showResult('miss', 'HIT', `dodged in ${Math.round(reactionMs)}ms — too early, it hadn't landed yet`);
+      } else if (reactionMs <= currentRound.perfectMs * (cfg.counterEnabled ? cfg.counterFraction/100 : -1)) {
+        currentRound.outcome = "COUNTER";
+        streak++;
+        applyDegradation(-cfg.degradationRecoverPerPerfect);
+        showResult('counter', 'COUNTER', `${Math.round(reactionMs)}ms — hit them mid-windup`);
       } else if (reactionMs <= currentRound.perfectMs) {
         currentRound.outcome = "GREEN";
         streak++;
+        applyDegradation(-cfg.degradationRecoverPerPerfect);
         showResult('perfect', 'PERFECT', `${Math.round(reactionMs)}ms`);
       } else {
         currentRound.outcome = "YELLOW";
         streak++;
+        applyDegradation(cfg.degradationPerDodge);
         showResult('normal', 'DODGED', `${Math.round(reactionMs)}ms`);
       }
     }
@@ -708,13 +1512,53 @@
     data.push(Object.assign({}, currentRound));
     logRow(currentRound);
     updateStats();
-    after(950, scheduleNextRound);
+
+    const canTriggerSpecial = cfg.specialsEnabled && currentStyleName && currentRound.outcome === 'RED'
+      && !wasFake && (currentRound.type === 'HEAVY' || currentRound.type === 'JAB');
+    const sp = canTriggerSpecial ? SPECIALS[currentStyleName] : null;
+    if (sp && sp.type === 'onHitBonus' && sp.triggerOn.includes(currentRound.type) && rollSpecialChance(sp.chance)) {
+      after(500, ()=> fireSpecialBonus(sp));
+    } else {
+      after(950, scheduleNextRound);
+    }
+  }
+
+  // A style's landed hit chains straight into its signature follow-up — brief callout, then an immediate,
+  // very tight bonus attack. Dodgeable, just hard. Resolves through the normal resolveRound like any round.
+  function fireSpecialBonus(sp){
+    phase = 'special_intro';
+    hideResult();
+    arena.className = 'arena';
+    arena.querySelectorAll('.outline-box').forEach(n=>n.remove());
+    promptText.textContent = `⚡ ${sp.name}!`;
+    after(300, ()=>{
+      if (!running || paused) return;
+      roundNum++;
+      roundVal.textContent = roundNum;
+      currentRound = {
+        round: roundNum, type: 'SPECIAL_' + sp.bonus.style, style: null, color: null,
+        fakeHoldMs: null, startupMs: null, window: null, perfectMs: null,
+        reactionMs: null, outcome: null, note: "", preFired: false, specialName: sp.name, ts: new Date().toISOString()
+      };
+      beginReal(sp.bonus.style, GREEN, sp.bonus, sp);
+    });
   }
 
   // ---------------- input ----------------
   function handleDodge(){
     if (!running || paused) return;
-    if (phase === "idle" || phase === "resolved") return;
+    if (phase === "idle") {
+      if (!cfg.preFireEnabled || preFired) return;
+      const timeUntilRound = nextRoundAt - performance.now();
+      if (timeUntilRound <= cfg.preFireGraceMs) {
+        preFired = true;
+        preFireTime = performance.now();
+        promptText.textContent = 'dodge queued…';
+      }
+      // else: too early — click is simply ignored, not held for the rest of the wait
+      return;
+    }
+    if (phase !== "fake" && phase !== "real") return; // resolved, or the brief special-attack callout — ignore
     const reactionMs = performance.now() - cueStart;
     resolveRound(reactionMs);
   }
@@ -730,20 +1574,22 @@
   function fmt(ms){ return (ms === null || ms === undefined || isNaN(ms)) ? '—' : Math.round(ms) + 'ms'; }
 
   function updateStats(){
-    const timedGood = data.filter(d => d.reactionMs !== null && (d.outcome==="GREEN"||d.outcome==="YELLOW"));
+    const timedGood = data.filter(d => d.reactionMs !== null && (d.outcome==="GREEN"||d.outcome==="YELLOW"||d.outcome==="COUNTER"));
     document.getElementById('statAvg').textContent = timedGood.length ? fmt(timedGood.reduce((a,b)=>a+b.reactionMs,0)/timedGood.length) : '—';
     document.getElementById('statBest').textContent = timedGood.length ? fmt(Math.min(...timedGood.map(d=>d.reactionMs))) : '—';
 
-    const scored = data.filter(d=>d.outcome==="GREEN"||d.outcome==="YELLOW"||d.outcome==="RED");
-    const good = data.filter(d=>d.outcome==="GREEN"||d.outcome==="YELLOW").length;
+    const scored = data.filter(d=>d.outcome==="GREEN"||d.outcome==="YELLOW"||d.outcome==="RED"||d.outcome==="COUNTER");
+    const good = data.filter(d=>d.outcome==="GREEN"||d.outcome==="YELLOW"||d.outcome==="COUNTER").length;
     document.getElementById('statAcc').textContent = scored.length ? Math.round(100*good/scored.length) + '%' : '—';
 
-    document.getElementById('statFooled').textContent = data.filter(d=>d.note === "fooled by feint").length;
+    document.getElementById('statFooled').textContent = data.filter(d=>d.note === "fooled by feint" || d.note === "pre-fired into a feint").length;
+    document.getElementById('tCounter').textContent = data.filter(d=>d.outcome==="COUNTER").length || '—';
+    if (!cfg.degradationEnabled) document.getElementById('tDegradation').textContent = 'off';
 
     function byType(t){
       const rows = data.filter(d=>d.type===t);
       if (!rows.length) return '—';
-      const timed = rows.filter(d=>d.reactionMs!==null && (d.outcome==="GREEN"||d.outcome==="YELLOW"));
+      const timed = rows.filter(d=>d.reactionMs!==null && (d.outcome==="GREEN"||d.outcome==="YELLOW"||d.outcome==="COUNTER"));
       const avg = timed.length ? Math.round(timed.reduce((a,b)=>a+b.reactionMs,0)/timed.length) : null;
       return rows.length + ' runs' + (avg ? ` · ${avg}ms avg` : '');
     }
@@ -754,15 +1600,16 @@
   }
 
   function typeLabel(t){
-    return { HEAVY:'Heavy', JAB:'Jab', HEAVY_FEINT:'Heavy→Jab feint', JAB_FEINT:'Jab→Heavy feint' }[t] || t;
+    return { HEAVY:'Heavy', JAB:'Jab', HEAVY_FEINT:'Heavy→Jab feint', JAB_FEINT:'Jab→Heavy feint', SPECIAL_HEAVY:'⚡ Special (heavy)', SPECIAL_JAB:'⚡ Special (jab)' }[t] || t;
   }
 
   function logRow(r){
     const tbody = document.getElementById('logBody');
     const tr = document.createElement('tr');
-    const tagClass = r.outcome === 'GREEN' ? 'green' : r.outcome === 'YELLOW' ? 'yellow' : 'red';
-    const tagText = r.outcome === 'GREEN' ? 'PERFECT' : r.outcome === 'YELLOW' ? 'DODGE' : (r.note==='fooled by feint' ? 'FOOLED' : 'HIT');
-    tr.innerHTML = `<td>${r.round}</td><td>${typeLabel(r.type)}</td><td>${fmt(r.reactionMs)}</td><td><span class="tag ${tagClass}">${tagText}</span></td>`;
+    const tagClass = r.outcome === 'GREEN' ? 'green' : r.outcome === 'YELLOW' ? 'yellow' : r.outcome === 'COUNTER' ? 'counter' : 'red';
+    const tagText = r.outcome === 'GREEN' ? 'PERFECT' : r.outcome === 'YELLOW' ? 'DODGE' : r.outcome === 'COUNTER' ? 'COUNTER' : (r.note==='fooled by feint' || r.note==='pre-fired into a feint' ? 'FOOLED' : 'HIT');
+    const label = r.specialName ? `${typeLabel(r.type)} — ${r.specialName}` : typeLabel(r.type);
+    tr.innerHTML = `<td>${r.round}</td><td>${label}</td><td>${fmt(r.reactionMs)}</td><td><span class="tag ${tagClass}">${tagText}</span></td>`;
     tbody.appendChild(tr);
     const log = document.querySelector('.log');
     log.scrollTop = log.scrollHeight;
@@ -770,9 +1617,24 @@
 
   function pauseGame(){
     paused = true;
-    document.getElementById('pauseBtn').textContent = 'Resume';
+    setPauseButtonsText('Resume');
     document.getElementById('pauseNote').style.display = 'inline';
     clearTimers(); setArenaWhite(); phase = 'idle';
+  }
+  function setPauseButtonsText(text){
+    document.getElementById('pauseBtn').textContent = text;
+    document.getElementById('pauseBtnTop').textContent = text;
+  }
+  function togglePause(){
+    if (!running) return;
+    if (paused) {
+      paused = false;
+      setPauseButtonsText('Pause');
+      document.getElementById('pauseNote').style.display = 'none';
+      scheduleNextRound();
+    } else {
+      pauseGame();
+    }
   }
 
   // ---------------- controls ----------------
@@ -785,16 +1647,10 @@
     scheduleNextRound();
   });
 
-  document.getElementById('pauseBtn').addEventListener('click', ()=>{
-    if (!running) return;
-    if (paused) {
-      paused = false;
-      document.getElementById('pauseBtn').textContent = 'Pause';
-      document.getElementById('pauseNote').style.display = 'none';
-      scheduleNextRound();
-    } else {
-      pauseGame();
-    }
+  document.getElementById('pauseBtn').addEventListener('click', togglePause);
+  document.getElementById('pauseBtnTop').addEventListener('click', togglePause);
+  window.addEventListener('keydown', (e)=>{
+    if (e.key === 'p' || e.key === 'P') togglePause();
   });
 
   document.getElementById('resetBtn').addEventListener('click', ()=>{
@@ -806,7 +1662,7 @@
 
   document.getElementById('exportBtn').addEventListener('click', ()=>{
     if (!data.length) return;
-    const cols = ['round','type','style','color','fakeHoldMs','window','perfectMs','reactionMs','outcome','note','ts'];
+    const cols = ['round','type','style','color','fakeHoldMs','startupMs','window','perfectMs','reactionMs','outcome','note','preFired','specialName','ts'];
     const rows = [cols.join(',')].concat(data.map(d=>cols.map(c=>{
       let v = d[c];
       if (v === null || v === undefined) v = '';
